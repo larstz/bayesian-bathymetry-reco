@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.40
+# v0.19.42
 
 using Markdown
 using InteractiveUtils
@@ -18,6 +18,9 @@ end
 begin
 	using Plots
 	using PlutoUI
+	using Random
+	using Statistics
+	using LaTeXStrings
 	using Optim
 end
 
@@ -43,18 +46,25 @@ We choose to measure two time steps, i.e., $t_0=0$ and $t_1=1$ at ten equidistan
 """
 
 # ╔═╡ 90e92c24-2ca6-11ef-054e-678404f733d1
-function u(x,t,c)
+function u(x,c)
 	# Function to evaluate the solution of the advection equation given, x,t,c
-	return exp(-0.5*(x-c*t)^2)
+	return exp(-0.5*(x[1]-c*x[2])^2)
 end
 
 # ╔═╡ a937f9f2-f6e9-4078-859c-92f325da8338
 begin
 	# define our measurement points
-	t = range(0,1,2)
+	t = range(0,1,10)
 	x = range(-2,2, 10)
-	x_t = vcat(hcat(x,repeat([t[1]], length(x))), hcat(x,repeat([t[2]], length(x))))
+	x_t = collect(Iterators.product(x,t))#vcat(hcat(x,repeat([t[1]], length(x))), hcat(x,repeat([t[2]], length(x))))
+	n = 0.5*randn(length(x_t))
 end
+
+# ╔═╡ c238e806-099a-4f32-a5c6-fa6eee237e24
+mean(n)
+
+# ╔═╡ 33f2b6d8-eab9-4f14-893a-a7d5068e0c9e
+std(n)
 
 # ╔═╡ 5d317012-60cd-43cb-b5ed-dd650f871901
 @bind i Slider(1:length(t))
@@ -66,7 +76,8 @@ Plot our measurement for the start and end of the chosen time interval
 
 # ╔═╡ b5ff80bb-349a-44db-8f14-a180a3611592
 begin
-	plot(x, u.(x_t[(i-1)*length(x)+1:i*length(x),1],x_t[(i-1)*length(x)+1:i*length(x),2],1))
+	plot(x, u.(x_t[:,i],1)+n[(i-1)*length(x)+1:i*length(x)], label="u(x,$(round(t[i],digits=2)))+n", title=L"n\sim \mathcal{N}(0,0.5)")
+	plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),1)+n)), legend=:topleft)
 end
 
 # ╔═╡ c1fd2d59-4433-4f50-805b-6aae629c1fac
@@ -82,33 +93,39 @@ y=u(x,t;c).
 ```
 Given our measurements $y_{i,j} = u(x_i,t_j;c)$, we can formulate an objective function we want to minimize with respect to our velocity $c$. We collect all measurements into a vector $y_{obs}=(y_{1,0},...,y_{10,0},y_{0,1},...,y_{10,1})$. The objective function we chose using our forward model $u(x,t)$ and our measurements $y_{obs}$ is
 ```math 
-J(c) = \| y_{obs} - u(x_{obs},t_{obs},c)\|^2
+J(c) = \| y_{obs} - u(x_{obs},t_{obs},c)\|^2 + \lambda c^2
 ```
 """
 
 # ╔═╡ 14a68682-a574-45de-a4e1-62dc77c0b9b7
-function cost(x,t,y,c)
-	transpose((y-u.(x,t,c)))*((y-u.(x,t,c)))
+function cost(x,y,c; λ=0.1)
+	transpose((y-u.(x,c)))*((y-u.(x,c))) + λ*transpose(c)*c
 end
 
 # ╔═╡ 88088cc3-f2b3-4331-a51d-96f95cdecaf3
 begin
-	y_0 = u.(x,t[1],1)
-	y_1 = u.(x,t[end],1)
-	y = vcat(y_0, y_1)
+	x_obs = vec(x_t)
+	y_obs = u.(x_obs,1) + n
 end
 
 # ╔═╡ 16b2707f-449c-472d-b4d2-0b3b0922ebc0
-optimize(c->cost(x_t[:,1],x_t[:,2],y,c), zeros(1))
+res=optimize(c->cost(x_obs,y_obs,c), zeros(1), LBFGS())
+
+# ╔═╡ ab0fdae4-8bc6-4da0-8ff6-e1bcd3d10b36
+Optim.minimizer(res)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+LaTeXStrings = "~1.3.1"
 Optim = "~1.9.4"
 Plots = "~1.40.4"
 PlutoUI = "~0.7.59"
@@ -118,9 +135,9 @@ PlutoUI = "~0.7.59"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.1"
+julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "edb53258b47f881bce8a3c4bb475c57d8b2a6562"
+project_hash = "2ae1f7dbf5e64261dc8508e619506f9ad3926743"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -242,7 +259,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.2+0"
+version = "1.1.1+0"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -577,21 +594,26 @@ version = "0.16.3"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
-version = "0.6.3"
+version = "0.6.4"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "7.84.0+0"
+version = "8.4.0+0"
 
 [[deps.LibGit2]]
-deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
+deps = ["Base64", "LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
+
+[[deps.LibGit2_jll]]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll"]
+uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
+version = "1.6.4+0"
 
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.10.2+0"
+version = "1.11.0+1"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -703,7 +725,7 @@ version = "1.1.9"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.2+0"
+version = "2.28.2+1"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
@@ -721,7 +743,7 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.10.11"
+version = "2023.1.10"
 
 [[deps.NLSolversBase]]
 deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
@@ -748,12 +770,12 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.21+4"
+version = "0.3.23+4"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+0"
+version = "0.8.1+2"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -799,7 +821,7 @@ version = "1.6.3"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.42.0+0"
+version = "10.42.0+1"
 
 [[deps.Parameters]]
 deps = ["OrderedCollections", "UnPack"]
@@ -827,7 +849,7 @@ version = "0.43.4+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.9.0"
+version = "1.10.0"
 
 [[deps.PlotThemes]]
 deps = ["PlotUtils", "Statistics"]
@@ -900,7 +922,7 @@ deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.Random]]
-deps = ["SHA", "Serialization"]
+deps = ["SHA"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [[deps.RecipesBase]]
@@ -974,6 +996,7 @@ version = "1.2.1"
 [[deps.SparseArrays]]
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+version = "1.10.0"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
@@ -995,7 +1018,7 @@ version = "1.4.3"
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-version = "1.9.0"
+version = "1.10.0"
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
@@ -1014,9 +1037,9 @@ deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[deps.SuiteSparse_jll]]
-deps = ["Artifacts", "Libdl", "Pkg", "libblastrampoline_jll"]
+deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
-version = "5.10.1+6"
+version = "7.2.1+1"
 
 [[deps.TOML]]
 deps = ["Dates"]
@@ -1283,7 +1306,7 @@ version = "1.5.0+0"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.13+0"
+version = "1.2.13+1"
 
 [[deps.Zstd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1324,7 +1347,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.8.0+0"
+version = "5.8.0+1"
 
 [[deps.libevdev_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1365,12 +1388,12 @@ version = "1.1.6+0"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.48.0+0"
+version = "1.52.0+1"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+0"
+version = "17.4.0+2"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1393,15 +1416,18 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╠═114b4a81-8ed0-4b3a-8589-41cc5b7eff11
-# ╠═40b5a004-1fec-469a-b709-3d6ae68f2e61
+# ╟─40b5a004-1fec-469a-b709-3d6ae68f2e61
 # ╠═90e92c24-2ca6-11ef-054e-678404f733d1
 # ╠═a937f9f2-f6e9-4078-859c-92f325da8338
+# ╠═c238e806-099a-4f32-a5c6-fa6eee237e24
+# ╠═33f2b6d8-eab9-4f14-893a-a7d5068e0c9e
 # ╟─5d317012-60cd-43cb-b5ed-dd650f871901
 # ╟─8203593d-4b59-4e3c-8936-6600f281e6f4
 # ╠═b5ff80bb-349a-44db-8f14-a180a3611592
-# ╠═c1fd2d59-4433-4f50-805b-6aae629c1fac
+# ╟─c1fd2d59-4433-4f50-805b-6aae629c1fac
 # ╠═14a68682-a574-45de-a4e1-62dc77c0b9b7
 # ╠═88088cc3-f2b3-4331-a51d-96f95cdecaf3
 # ╠═16b2707f-449c-472d-b4d2-0b3b0922ebc0
+# ╠═ab0fdae4-8bc6-4da0-8ff6-e1bcd3d10b36
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
