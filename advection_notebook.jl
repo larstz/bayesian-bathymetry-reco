@@ -25,6 +25,9 @@ begin
 	using Turing
 end
 
+# ╔═╡ 5936c617-4d70-48a4-bb52-84d898fe4d6e
+Plots.scalefontsizes(1.25)
+
 # ╔═╡ 40b5a004-1fec-469a-b709-3d6ae68f2e61
 md"""
 # Simple Inverse Problem with PDE
@@ -49,7 +52,7 @@ We choose to measure two time steps, i.e., $t_0=0$ and $t_1=1$ at ten equidistan
 # ╔═╡ 90e92c24-2ca6-11ef-054e-678404f733d1
 function u(x,c)
 	# Function to evaluate the solution of the advection equation given, x,t,c
-	return exp(-0.5*(x[1]-c*x[2])^2)
+	return exp(-0.5*(x[1]-c*x[2]+2)^2)
 end
 
 # ╔═╡ a937f9f2-f6e9-4078-859c-92f325da8338
@@ -58,19 +61,10 @@ begin
 	t = range(0,1,10)
 	x = range(-2,2, 50)
 	x_t = collect(Iterators.product(x,t))#vcat(hcat(x,repeat([t[1]], length(x))), hcat(x,repeat([t[2]], length(x))))
-	std_v = 0.05
+	std_v = 0.1
 	n = std_v*randn(length(x_t))
-	c = 1
+	c = 4
 end
-
-# ╔═╡ c238e806-099a-4f32-a5c6-fa6eee237e24
-mean(n)
-
-# ╔═╡ 33f2b6d8-eab9-4f14-893a-a7d5068e0c9e
-var(n)
-
-# ╔═╡ b8cb51b4-be6d-4834-b0f9-7e230e4767d6
-u.(x_t,)
 
 # ╔═╡ 5d317012-60cd-43cb-b5ed-dd650f871901
 @bind i Slider(1:length(t))
@@ -82,9 +76,21 @@ Plot our measurement for the start and end of the chosen time interval
 
 # ╔═╡ b5ff80bb-349a-44db-8f14-a180a3611592
 begin
-	plot(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], label="u(x,$(round(t[i],digits=2)))+n", title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))")
+	plot(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
+		label="u(x,$(round(t[i],digits=2)))+n", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
 	plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),c)+n)), legend=:topleft)
 end
+
+# ╔═╡ 70e13382-6c32-420e-bad1-d1d6ae972950
+@gif for i in 1:length(t)
+	plot(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
+		label="u(x,$(round(t[i],digits=2)))+n", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
+	plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),c)+n)), legend=:topleft)
+end fps=4
 
 # ╔═╡ c1fd2d59-4433-4f50-805b-6aae629c1fac
 md"""
@@ -117,7 +123,7 @@ end
 # ╔═╡ 88088cc3-f2b3-4331-a51d-96f95cdecaf3
 begin
 	x_obs = vec(x_t)
-	y_obs = u.(x_obs,1) + n
+	y_obs = u.(x_obs,c) + n
 end
 
 # ╔═╡ 16b2707f-449c-472d-b4d2-0b3b0922ebc0
@@ -125,6 +131,15 @@ res=optimize(c->cost(x_obs,y_obs,c), zeros(1), LBFGS())
 
 # ╔═╡ ab0fdae4-8bc6-4da0-8ff6-e1bcd3d10b36
 Optim.minimizer(res)
+
+# ╔═╡ d81eb467-8454-4365-9e69-30e9d6a5f0bf
+@bind l Slider(-10:.1:20; default=0.1, show_value=true)
+
+# ╔═╡ 00467666-6941-41b6-a056-75d4b3de14e8
+begin
+	obs_cost = c->cost(x_obs,y_obs,c; λ=l)
+	plot(-10:0.1:10, obs_cost.(-10:0.1:10), title="Regularization parameter " *L"\lambda=%$(l)")
+end
 
 # ╔═╡ 11662c88-e446-4496-b804-84fbb15573d8
 md"""
@@ -174,37 +189,50 @@ Using $N\sim \mathcal{N}(0,\sigma)$, i.e., $\pi_\mathrm{noise}(n)=\frac{1}{\sqrt
 ```
 """
 
-# ╔═╡ b0aed820-a030-4bfb-b9d4-f5584917e9d1
-@model function model_function(y)
-    s ~ Poisson(1)
-    y ~ Normal(s, 1)
-    return y
-end
-
-
 # ╔═╡ 14ccbe26-39fc-4322-97dc-c9a7057204bb
 @model function bayesian_advection(x_t, y)
-	c ~ Uniform(0,10)
+	# Using the Turing package define a probabilistic model
+	c ~ Uniform(-10,10) # Prior for c
 	m = u.(x_t,c)
 	for i in eachindex(y)
-		y[i] ~ Normal(m[i], std_v)
+		y[i] ~ Normal(m[i], std_v) # likelihood for y given measurement m and standard deviation of noise
 	end
 end
+
+# ╔═╡ 7bc1a588-5349-47dc-9f67-3c4fa3993e56
+pdf.(Normal.(u.(x_obs,c), std_v), y_obs)
+
+# ╔═╡ 5677f549-9143-4c69-bc41-b490400c268a
+md"""
+#### Markov Chain Montecarlo (MCMC)
+To get data samples from our posterior we use an implemented MCMC algorithm
+"""
+
+# ╔═╡ 2dbb793d-3025-4cb3-a10c-072a0656f5c1
+function posterior(c)
+	prod((pdf.(Normal.(u.(x_obs,c), std_v), y_obs)))*pdf(Normal(1,10),c)
+end
+
+# ╔═╡ 0324986b-200b-479c-b1d0-5ef348ed75f7
+plot(-10:0.1:10, posterior.(-10:0.1:10))
 
 # ╔═╡ 99d77a2a-10d0-468d-8666-2f4d53f8a214
 adv_chain = sample(bayesian_advection(x_obs, y_obs), MH(), 1000)
 
 # ╔═╡ 9446dc74-ca94-44c5-9957-14b6d59f9be9
 begin
-	density(adv_chain)
-	vline!(mean(adv_chain).nt[:mean])
+	density(adv_chain, lw=3)
+	vline!(mean(adv_chain).nt[:mean], lw=3)
 end
 
 # ╔═╡ 9b3a6799-a35c-4d14-9db9-75c5991d3b2d
-plot(adv_chain)
+plot(adv_chain, lw=3)
 
 # ╔═╡ fc2fe2eb-f5a2-4d1a-85e9-6a5e90b186ae
-summarystats(adv_chain)
+summarystats(adv_chain)[:c]
+
+# ╔═╡ b558fd2e-fe47-4347-8f2f-d000a788f4cb
+hpd(adv_chain, alpha = 0.05)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2550,26 +2578,31 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╠═114b4a81-8ed0-4b3a-8589-41cc5b7eff11
+# ╠═5936c617-4d70-48a4-bb52-84d898fe4d6e
 # ╟─40b5a004-1fec-469a-b709-3d6ae68f2e61
 # ╠═90e92c24-2ca6-11ef-054e-678404f733d1
 # ╠═a937f9f2-f6e9-4078-859c-92f325da8338
-# ╠═c238e806-099a-4f32-a5c6-fa6eee237e24
-# ╠═33f2b6d8-eab9-4f14-893a-a7d5068e0c9e
-# ╠═b8cb51b4-be6d-4834-b0f9-7e230e4767d6
-# ╟─5d317012-60cd-43cb-b5ed-dd650f871901
+# ╠═5d317012-60cd-43cb-b5ed-dd650f871901
 # ╟─8203593d-4b59-4e3c-8936-6600f281e6f4
-# ╠═b5ff80bb-349a-44db-8f14-a180a3611592
+# ╟─b5ff80bb-349a-44db-8f14-a180a3611592
+# ╟─70e13382-6c32-420e-bad1-d1d6ae972950
 # ╟─c1fd2d59-4433-4f50-805b-6aae629c1fac
 # ╠═14a68682-a574-45de-a4e1-62dc77c0b9b7
 # ╠═88088cc3-f2b3-4331-a51d-96f95cdecaf3
 # ╠═16b2707f-449c-472d-b4d2-0b3b0922ebc0
 # ╠═ab0fdae4-8bc6-4da0-8ff6-e1bcd3d10b36
+# ╠═d81eb467-8454-4365-9e69-30e9d6a5f0bf
+# ╠═00467666-6941-41b6-a056-75d4b3de14e8
 # ╟─11662c88-e446-4496-b804-84fbb15573d8
-# ╠═b0aed820-a030-4bfb-b9d4-f5584917e9d1
 # ╠═14ccbe26-39fc-4322-97dc-c9a7057204bb
+# ╠═7bc1a588-5349-47dc-9f67-3c4fa3993e56
+# ╟─5677f549-9143-4c69-bc41-b490400c268a
+# ╠═2dbb793d-3025-4cb3-a10c-072a0656f5c1
+# ╠═0324986b-200b-479c-b1d0-5ef348ed75f7
 # ╠═99d77a2a-10d0-468d-8666-2f4d53f8a214
 # ╠═9446dc74-ca94-44c5-9957-14b6d59f9be9
 # ╠═9b3a6799-a35c-4d14-9db9-75c5991d3b2d
 # ╠═fc2fe2eb-f5a2-4d1a-85e9-6a5e90b186ae
+# ╠═b558fd2e-fe47-4347-8f2f-d000a788f4cb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
