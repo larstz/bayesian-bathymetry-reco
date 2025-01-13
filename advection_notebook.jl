@@ -1,22 +1,24 @@
 ### A Pluto.jl notebook ###
-# v0.19.40
+# v0.20.3
 
 using Markdown
 using InteractiveUtils
 
 # This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
 macro bind(def, element)
+    #! format: off
     quote
         local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
         local el = $(esc(element))
         global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
         el
     end
+    #! format: on
 end
 
 # ╔═╡ 114b4a81-8ed0-4b3a-8589-41cc5b7eff11
 begin
-	using Plots, StatsPlots
+	using Plots, StatsPlots, StatsBase
 	using PlutoUI
 	using Random
 	using Statistics
@@ -58,16 +60,18 @@ end
 # ╔═╡ a937f9f2-f6e9-4078-859c-92f325da8338
 begin
 	# define our measurement points
-	t = range(0,1,10)
-	x = range(-2,2, 50)
-	x_t = collect(Iterators.product(x,t))#vcat(hcat(x,repeat([t[1]], length(x))), hcat(x,repeat([t[2]], length(x))))
+	t = range(0,1,4)
+	x = range(-2,2, 20)
+	x_t = collect(Iterators.product(x,t))
+	x_t_obs = collect(Iterators.product([1],t))
 	std_v = 0.1
 	n = std_v*randn(length(x_t))
+	n_obs = std_v*randn(length(x_t_obs))
 	c = 4
 end
 
-# ╔═╡ 5d317012-60cd-43cb-b5ed-dd650f871901
-@bind i Slider(1:length(t))
+# ╔═╡ 0a27b335-1661-4b7b-be25-94decde24969
+@bind i_t Slider(1:length(t))
 
 # ╔═╡ 8203593d-4b59-4e3c-8936-6600f281e6f4
 md"""
@@ -76,21 +80,26 @@ Plot our measurement for the start and end of the chosen time interval
 
 # ╔═╡ b5ff80bb-349a-44db-8f14-a180a3611592
 begin
+	plot(x, u.(x_t[:,i_t],c)+n[(i_t-1)*length(x)+1:i_t*length(x)], 
+		label="u(x,$(round(t[i_t],digits=2)))+n", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
+	scatter!([-1,0,1], u.(x_t_obs[:,i_t],c))
+	plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),c)+n)), legend=:topleft)
+end
+
+# ╔═╡ 70e13382-6c32-420e-bad1-d1d6ae972950
+begin
+adv_ani = @animate for i in 1:length(t)
 	plot(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
 		label="u(x,$(round(t[i],digits=2)))+n", 
 		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
 		lw=3)
 	plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),c)+n)), legend=:topleft)
 end
+gif(adv_ani, "/DATA/Dokumente/DASHH Project Meeting/bayesian-inverse-slides/plots/advection_animation.gif", fps=5)
+end
 
-# ╔═╡ 70e13382-6c32-420e-bad1-d1d6ae972950
-@gif for i in 1:length(t)
-	plot(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
-		label="u(x,$(round(t[i],digits=2)))+n", 
-		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
-		lw=3)
-	plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),c)+n)), legend=:topleft)
-end fps=4
 
 # ╔═╡ c1fd2d59-4433-4f50-805b-6aae629c1fac
 md"""
@@ -122,29 +131,69 @@ end
 
 # ╔═╡ 88088cc3-f2b3-4331-a51d-96f95cdecaf3
 begin
-	x_obs = vec(x_t)
-	y_obs = u.(x_obs,c) + n
+	x_obs = vec(x_t_obs)
+	y_obs = u.(x_obs,c) + n_obs
+	x_total = vec(x_t)
+	y_total = u.(x_total, c) + n
 end
 
 # ╔═╡ 16b2707f-449c-472d-b4d2-0b3b0922ebc0
-res=optimize(c->cost(x_obs,y_obs,c), zeros(1), LBFGS())
+res=optimize(c->cost(x_obs,y_obs,c; λ=0), ones(1), LBFGS())
+
+# ╔═╡ c377fa5d-4802-4399-a219-109ed7479f69
+res_total=optimize(c->cost(x_total, y_total,c;λ=0), ones(1), LBFGS())
+
+# ╔═╡ 4991c2ba-3830-4264-8f59-02f8f5784e0c
+Optim.minimizer(res_total)
 
 # ╔═╡ ab0fdae4-8bc6-4da0-8ff6-e1bcd3d10b36
-Optim.minimizer(res)
+c_res = Optim.minimizer(res)
+
+# ╔═╡ 1bf44de3-3004-4b95-abd6-a3040ec9c9bb
+begin
+adv_classic_ani = @animate for i in 1:length(t)
+	plot(x, u.(x_t[:,i],c_res)+n[(i-1)*length(x)+1:i*length(x)],
+			label=L"\hat{u}", 
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+			lw=3,
+			size=(1280/2,720/2))
+	plot!(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
+		label="u+n Truth", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
+	plot!(xlims=(-2,2), ylims=(0,1.2), legend=:topleft)
+	xlabel!("x")
+	ylabel!("u")
+end
+gif(adv_classic_ani, "/DATA/Dokumente/DASHH Project Meeting/bayesian-inverse-slides/plots/advection_animation_classic.gif", fps=5)
+end
 
 # ╔═╡ d81eb467-8454-4365-9e69-30e9d6a5f0bf
-@bind l Slider(-10:.1:20; default=0.1, show_value=true)
+@bind l Slider(0:.1:20; default=0.1, show_value=true)
 
 # ╔═╡ 00467666-6941-41b6-a056-75d4b3de14e8
 begin
+	save_reg = :false
 	obs_cost = c->cost(x_obs,y_obs,c; λ=l)
-	plot(-10:0.1:10, obs_cost.(-10:0.1:10), title="Regularization parameter " *L"\lambda=%$(l)")
+	obs_t = c->cost(x_total, y_total,c; λ=l)
+	plot(-10:0.1:10, obs_cost.(-10:0.1:10), lw=3, title="Regularization parameter " *L"\lambda=%$(l)", legend=:false, size=(1280/2,720/2))
+	plot!(-10:0.1:10, obs_t.(-10:0.1:10),lw=3)
+	xlabel!("c")
+	ylabel!("L(c)")
+	plot!(ylims=(-0.5,10))
+	
+end
+
+# ╔═╡ 1d573890-0261-4d33-ad8a-f0b526010a41
+if save_reg
+	
+	savefig("/DATA/Dokumente/DASHH Project Meeting/bayesian-inverse-slides/plots/objective.pdf")
 end
 
 # ╔═╡ 11662c88-e446-4496-b804-84fbb15573d8
 md"""
 ## Going Bayesian
-To frame the inverse problem as bayesian, we view all parameters and all data as random variables, i.e., $c \rightarrow C \sim P_C$, $x\rightarrow X \sim P_X$, $t\rightarrow T \sim P_T$, $y\rightarrow Y \sim P_Y$.
+To frame the inverse problem as bayesian, we view all parameters and all data as random variables, i.e., $c \rightarrow C \sim P_C$, $y\rightarrow Y \sim P_Y$.
 
 The random variable $Y$ is again the measurement and its realization $Y=y_{obs}$ the actual measurement. The nonobservable random variable $C$ is the unknown and of primary interst. The other random variables, i.e., $X,T,N$, are called parameters or noise.
 
@@ -154,7 +203,7 @@ Assume we found the joint probability density of $Y,C$ after measurement, denote
 
 Assume we know the value of $X=x$, we can formulate the conditional probability of $Y$ given $C=c$ (**likelihood**)
 ```math
-\pi(y|x)=\frac{\pi(c,y)}{\pi_{pr}(c)}, \text{ if } \pi_{pr}(c)\neq 0.
+\pi(y|c)=\frac{\pi(c,y)}{\pi_{pr}(c)}, \text{ if } \pi_{pr}(c)\neq 0.
 ```
 
 Assume the measurement is given $Y=y_{obs}$, we can formulate the conditional probability of $C$ given the measurment (**posterior**)
@@ -192,21 +241,22 @@ Using $N\sim \mathcal{N}(0,\sigma)$, i.e., $\pi_\mathrm{noise}(n)=\frac{1}{\sqrt
 # ╔═╡ 14ccbe26-39fc-4322-97dc-c9a7057204bb
 @model function bayesian_advection(x_t, y)
 	# Using the Turing package define a probabilistic model
-	c ~ Uniform(-10,10) # Prior for c
-	m = u.(x_t,c)
+	#c ~ Uniform(-10,10) # Prior for c
+	c ~ Normal(1,10)
+	m = u.(x_t_obs,c)
 	for i in eachindex(y)
 		y[i] ~ Normal(m[i], std_v) # likelihood for y given measurement m and standard deviation of noise
 	end
 end
-
-# ╔═╡ 7bc1a588-5349-47dc-9f67-3c4fa3993e56
-pdf.(Normal.(u.(x_obs,c), std_v), y_obs)
 
 # ╔═╡ 5677f549-9143-4c69-bc41-b490400c268a
 md"""
 #### Markov Chain Montecarlo (MCMC)
 To get data samples from our posterior we use an implemented MCMC algorithm
 """
+
+# ╔═╡ 9d5042d4-9a6d-402a-a9b2-5dc497dc8315
+size(x_obs)
 
 # ╔═╡ 2dbb793d-3025-4cb3-a10c-072a0656f5c1
 function posterior(c)
@@ -217,22 +267,236 @@ end
 plot(-10:0.1:10, posterior.(-10:0.1:10))
 
 # ╔═╡ 99d77a2a-10d0-468d-8666-2f4d53f8a214
-adv_chain = sample(bayesian_advection(x_obs, y_obs), MH(), 1000)
-
-# ╔═╡ 9446dc74-ca94-44c5-9957-14b6d59f9be9
-begin
-	density(adv_chain, lw=3)
-	vline!(mean(adv_chain).nt[:mean], lw=3)
-end
+adv_chain = sample(bayesian_advection(x_obs, y_obs), MH(), 1000, drop_warmup=150)
 
 # ╔═╡ 9b3a6799-a35c-4d14-9db9-75c5991d3b2d
 plot(adv_chain, lw=3)
 
 # ╔═╡ fc2fe2eb-f5a2-4d1a-85e9-6a5e90b186ae
-summarystats(adv_chain)[:c]
+adv_stats = summarystats(adv_chain[:c])
 
 # ╔═╡ b558fd2e-fe47-4347-8f2f-d000a788f4cb
 hpd(adv_chain, alpha = 0.05)
+
+# ╔═╡ dac33437-8e87-49e2-9392-9d21b4a3cb95
+ adv_chain[:c]
+
+# ╔═╡ 8e9d8cb5-6a98-462e-af7e-157ba1d8e9e2
+h = fit(Histogram , adv_chain[:c][:], -4:0.01:7)
+
+# ╔═╡ e64cc82f-30cf-4e6f-ae67-13be686117a4
+h.weights
+
+# ╔═╡ d543ba87-4aa8-404a-8c75-316680153485
+h.edges
+
+# ╔═╡ d2d28682-fe63-48b4-8c55-73de5d3d33f7
+plot(-4+0.01:0.01:7.0, h.weights)
+
+# ╔═╡ 4a92ab37-a6ee-4709-9b64-445665066ac1
+maximum(h.weights)/sum(h.weights)
+
+# ╔═╡ bef0b969-4844-49b1-8ae5-e92f47824af8
+findmax(h.weights)
+
+# ╔═╡ 3c65fdad-191c-49fa-aa69-6d35e8e2a76a
+
+
+# ╔═╡ 93a7ce70-445b-4704-bc3f-49965cd7fd56
+@bind i Slider(1:length(t))
+
+# ╔═╡ a1cd0ad6-618d-464b-9383-c009c00e91c4
+begin
+vel = adv_chain[:c][1]
+plot(x, u.(x_t[:,i],vel)+n[(i-1)*length(x)+1:i*length(x)], 
+			label="u(x,$(round(t[i],digits=2)))+n", 
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+			lw=3)
+plot!(xlims=(-2,2), ylims=(0,maximum(u.(vec(x_t),vel)+n)), legend=:topleft)
+end
+
+# ╔═╡ d90e5e8c-36d0-47e4-bb4a-5344394a5005
+begin
+	mu = adv_stats.mean
+	std_fit = adv_stats.sd
+	save_uncertainty=:true
+	f = v->u.(x_t[:,i],v)
+	xerr=std_fit*x_t[2,i][2]
+	plot(x, f(mu), fc=:orange, fa=0.3,
+		xerror=xerr,
+			label=L"\hat{u}\pm\sigma", 
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+			lw=3,
+			size=(1280/2,720/2))
+	plot!(x, f(mu-std_fit),label="")
+	plot!(x, f(mu+std_fit),label="")
+	plot!(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
+		label="u+n Truth", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
+	plot!(xlims=(-2,2), ylims=(0,1.2), legend=:topleft)
+	xlabel!("x")
+	ylabel!("u")
+end
+
+# ╔═╡ 8559dacb-b06e-4223-be85-d6aa97d45598
+begin
+	plot(x, f(mu), fc=:orange, fa=0.3,
+		xerror=(f(mu-std_fit),f(mu+std_fit)),
+			label=L"\hat{u}\pm\sigma", 
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+			lw=3,
+			size=(1280/2,720/2))
+	for vel in adv_chain[:c]
+	plot!(x, f(vel), fc=:orange, fa=0.3,
+			lw=3,
+			size=(1280/2,720/2))
+	end
+end
+
+# ╔═╡ 62b3f081-096c-4892-98bd-6b264661fcaa
+x_t[:,i]
+
+# ╔═╡ 7563dd79-45b7-4829-9c3f-299fe06bb638
+begin
+	plot(x, f(mu), fc=:orange, fa=0.3,
+			label=L"\hat{u}\pm\sigma", 
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+			lw=3,
+			size=(1280/2,720/2))
+	for vel in adv_chain[:c]
+		plot!(x, f(vel), label="")
+	end
+	plot!(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
+		label="u+n Truth", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
+	plot!(xlims=(-2,2), ylims=(0,1.2), legend=:topleft)
+	xlabel!("x")
+	ylabel!("u")
+end
+
+# ╔═╡ 53907b87-2262-43a6-9823-e85af8f1e5ca
+std_fit
+
+# ╔═╡ 89d9710c-d20f-4937-be38-ee5f8b775980
+begin
+adv_bayes_ani = @animate for i in 1:length(t)
+	f = v->u.(x_t[:,i],v)
+	mu = adv_stats.mean
+	std_fit = adv_stats.sd
+	plot(x, f(mu), fc=:orange, fa=0.3,
+			label=L"\hat{u}\pm\sigma", 
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+			lw=3,
+			size=(1280/2,720/2))
+	plot!(x, f(mu-std_fit), fillrange=f(mu+std_fit), fillalpha=0.2, c=1, primary=:false,
+			title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))", linealpha=0,
+			size=(1280/2,720/2))
+	plot!(x, u.(x_t[:,i],c)+n[(i-1)*length(x)+1:i*length(x)], 
+		label="u+n Truth", 
+		title=L"n\sim \mathcal{N}(0,%$(round(std_v^2,digits=4)))",
+		lw=3)
+	plot!(xlims=(-2,2), ylims=(0,1.2), legend=:topleft)
+	xlabel!("x")
+	ylabel!("u")
+end
+gif(adv_bayes_ani, "/DATA/Dokumente/DASHH Project Meeting/bayesian-inverse-slides/plots/advection_animation_bayes.gif", fps=5)
+end
+
+# ╔═╡ 2a1ddf1d-df34-41f6-9a2a-7dab7ed1dd47
+begin
+if save_uncertainty
+	savefig("/DATA/Dokumente/DASHH Project Meeting/bayesian-inverse-slides/plots/solution_uncertainty.pdf")
+end
+end
+
+# ╔═╡ 242ad05f-73ba-4a60-917d-1198f4ae90df
+quantile(f.(adv_chain[:c][:]), 0.05)
+
+# ╔═╡ f0c9697e-c262-48d0-9a9b-8dc46979054d
+# TODO: implement PDE solver for advection equation and use the solver as foreward model. Furthermore try to code a wrapper for daedalus project to use as shallow water equation solver
+
+# ╔═╡ d54c04f3-8473-439a-8ba8-29bdd78aa2e8
+function advection(T, δt, δx, U)
+	N = length(T)
+	T′ = similar(T)  # create new vector of the same length
+	
+	# bulk cells:
+	for i in 2:N  
+		T′[i] = T[i] - δt * U * (T[i] - T[i-1]) / δx
+	end
+
+	# boundary cells:
+	T′[1] = T′[N]  # periodic
+	
+	return T′
+end
+
+# ╔═╡ e0530fde-935d-4e3e-a233-7e115e6ee4b4
+T₀(x) = exp(-0.5*(x+2)^2)
+
+# ╔═╡ 25309944-e77f-4b07-a0dc-9c3d3b91ba70
+function evolve(method, xs, δt, U, t_final=4.0, f₀=T₀)
+	
+	T = f₀.(xs)  
+	δx = xs[2] - xs[1]
+	
+	t = 0.0
+	ts = [t]
+	
+	results = [T]
+	
+	while t < t_final
+		T′ = method(T, δt, δx, U)  # new
+		push!(results, T′)
+		
+		t += δt
+		push!(ts, t)
+		
+		T = copy(T′)
+
+	end
+	
+	return ts, results
+end
+
+# ╔═╡ db2ffc3e-621e-4cb1-b7b8-335ccf6245b8
+ts, res_pde = evolve(advection, x, 0.001, 4.0)
+
+# ╔═╡ 84fae587-ed76-403c-9085-9c0ebefb6386
+@bind t_idx Slider(eachindex(ts))
+
+# ╔═╡ c6da2cad-9058-4b04-91b8-366a073ac81a
+begin
+	plot(x, res_pde[t_idx], ylims=(0,1))
+end
+
+# ╔═╡ a5698173-ff23-4d92-a77d-1e0835e009ab
+plot(x, ts, mapreduce(permutedims, vcat, res_pde), st=:surface)
+
+# ╔═╡ c146ecbc-ee55-4560-a21f-c7566bc5a7dc
+function fd_solver(u_0,c,Δt,Δx,T)
+	timesteps = 0:Δt:T
+	u = u_0
+	u[1]=0
+	for t in timesteps
+		u_old = u
+		for i in eachindex(u)[2:end]
+			u[i] = u_old[i]-c*Δt/Δx*(u_old[i]-u_old[i-1])
+		end
+	end
+	return u[2:end]
+end
+
+# ╔═╡ 0ad8cec4-d364-42f3-a8b7-b5f03f3b7ccb
+plot(fd_solver(u.(x_t[:,1],c), 2, 0.01 , x[2]-x[1], 1))
+
+# ╔═╡ a54e430b-6efe-4de3-831e-40965bfca73c
+CFL = c*(0.05)/(x[2]-x[1])
+
+# ╔═╡ 73593762-3893-4bdf-8ce4-9776cb5df830
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -243,6 +507,7 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
@@ -251,6 +516,7 @@ LaTeXStrings = "~1.3.1"
 Optim = "~1.9.4"
 Plots = "~1.40.4"
 PlutoUI = "~0.7.59"
+StatsBase = "~0.34.3"
 StatsPlots = "~0.15.7"
 Turing = "~0.33.0"
 """
@@ -259,9 +525,9 @@ Turing = "~0.33.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.1"
+julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "ce31fea130968e7df791be307d10bdc609fa998b"
+project_hash = "783cb08df499a9e3530a829d71f51840798af59f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "016833eb52ba2d6bea9fcb50ca295980e728ee24"
@@ -634,7 +900,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.2+0"
+version = "1.1.1+0"
 
 [[deps.CompositionsBase]]
 git-tree-sha1 = "802bb88cd69dfd1509f6670416bd4434015693ad"
@@ -1246,21 +1512,26 @@ version = "0.2.0"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
-version = "0.6.3"
+version = "0.6.4"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "7.84.0+0"
+version = "8.4.0+0"
 
 [[deps.LibGit2]]
-deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
+deps = ["Base64", "LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
+
+[[deps.LibGit2_jll]]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll"]
+uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
+version = "1.6.4+0"
 
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.10.2+0"
+version = "1.11.0+1"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1435,7 +1706,7 @@ version = "1.1.9"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.2+0"
+version = "2.28.2+1"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
@@ -1459,7 +1730,7 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.10.11"
+version = "2023.1.10"
 
 [[deps.MultivariateStats]]
 deps = ["Arpack", "Distributions", "LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI", "StatsBase"]
@@ -1541,12 +1812,12 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.21+4"
+version = "0.3.23+4"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+0"
+version = "0.8.1+2"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -1631,7 +1902,7 @@ version = "1.6.3"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.42.0+0"
+version = "10.42.0+1"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1665,7 +1936,7 @@ version = "0.43.4+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.9.0"
+version = "1.10.0"
 
 [[deps.PlotThemes]]
 deps = ["PlotUtils", "Statistics"]
@@ -1767,7 +2038,7 @@ deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.Random]]
-deps = ["SHA", "Serialization"]
+deps = ["SHA"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [[deps.Random123]]
@@ -1985,6 +2256,7 @@ version = "1.2.1"
 [[deps.SparseArrays]]
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+version = "1.10.0"
 
 [[deps.SparseInverseSubset]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -2033,7 +2305,7 @@ version = "3.3.0"
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-version = "1.9.0"
+version = "1.10.0"
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
@@ -2088,9 +2360,9 @@ deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[deps.SuiteSparse_jll]]
-deps = ["Artifacts", "Libdl", "Pkg", "libblastrampoline_jll"]
+deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
-version = "5.10.1+6"
+version = "7.2.1+1"
 
 [[deps.SymbolicIndexingInterface]]
 git-tree-sha1 = "be414bfd80c2c91197823890c66ef4b74f5bf5fe"
@@ -2456,7 +2728,7 @@ version = "1.5.0+0"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.13+0"
+version = "1.2.13+1"
 
 [[deps.Zstd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -2503,7 +2775,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.8.0+0"
+version = "5.8.0+1"
 
 [[deps.libevdev_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2544,7 +2816,7 @@ version = "1.1.6+0"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.48.0+0"
+version = "1.52.0+1"
 
 [[deps.oneTBB_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -2555,7 +2827,7 @@ version = "2021.12.0+0"
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+0"
+version = "17.4.0+2"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2582,27 +2854,60 @@ version = "1.4.1+1"
 # ╟─40b5a004-1fec-469a-b709-3d6ae68f2e61
 # ╠═90e92c24-2ca6-11ef-054e-678404f733d1
 # ╠═a937f9f2-f6e9-4078-859c-92f325da8338
-# ╠═5d317012-60cd-43cb-b5ed-dd650f871901
+# ╠═0a27b335-1661-4b7b-be25-94decde24969
 # ╟─8203593d-4b59-4e3c-8936-6600f281e6f4
-# ╟─b5ff80bb-349a-44db-8f14-a180a3611592
-# ╟─70e13382-6c32-420e-bad1-d1d6ae972950
+# ╠═b5ff80bb-349a-44db-8f14-a180a3611592
+# ╠═70e13382-6c32-420e-bad1-d1d6ae972950
 # ╟─c1fd2d59-4433-4f50-805b-6aae629c1fac
 # ╠═14a68682-a574-45de-a4e1-62dc77c0b9b7
 # ╠═88088cc3-f2b3-4331-a51d-96f95cdecaf3
 # ╠═16b2707f-449c-472d-b4d2-0b3b0922ebc0
+# ╠═c377fa5d-4802-4399-a219-109ed7479f69
+# ╠═4991c2ba-3830-4264-8f59-02f8f5784e0c
 # ╠═ab0fdae4-8bc6-4da0-8ff6-e1bcd3d10b36
+# ╠═1bf44de3-3004-4b95-abd6-a3040ec9c9bb
 # ╠═d81eb467-8454-4365-9e69-30e9d6a5f0bf
 # ╠═00467666-6941-41b6-a056-75d4b3de14e8
+# ╠═1d573890-0261-4d33-ad8a-f0b526010a41
 # ╟─11662c88-e446-4496-b804-84fbb15573d8
 # ╠═14ccbe26-39fc-4322-97dc-c9a7057204bb
-# ╠═7bc1a588-5349-47dc-9f67-3c4fa3993e56
 # ╟─5677f549-9143-4c69-bc41-b490400c268a
+# ╠═9d5042d4-9a6d-402a-a9b2-5dc497dc8315
 # ╠═2dbb793d-3025-4cb3-a10c-072a0656f5c1
 # ╠═0324986b-200b-479c-b1d0-5ef348ed75f7
 # ╠═99d77a2a-10d0-468d-8666-2f4d53f8a214
-# ╠═9446dc74-ca94-44c5-9957-14b6d59f9be9
 # ╠═9b3a6799-a35c-4d14-9db9-75c5991d3b2d
 # ╠═fc2fe2eb-f5a2-4d1a-85e9-6a5e90b186ae
 # ╠═b558fd2e-fe47-4347-8f2f-d000a788f4cb
+# ╠═dac33437-8e87-49e2-9392-9d21b4a3cb95
+# ╠═8e9d8cb5-6a98-462e-af7e-157ba1d8e9e2
+# ╠═e64cc82f-30cf-4e6f-ae67-13be686117a4
+# ╠═d543ba87-4aa8-404a-8c75-316680153485
+# ╠═d2d28682-fe63-48b4-8c55-73de5d3d33f7
+# ╠═4a92ab37-a6ee-4709-9b64-445665066ac1
+# ╠═bef0b969-4844-49b1-8ae5-e92f47824af8
+# ╠═3c65fdad-191c-49fa-aa69-6d35e8e2a76a
+# ╠═a1cd0ad6-618d-464b-9383-c009c00e91c4
+# ╠═8559dacb-b06e-4223-be85-d6aa97d45598
+# ╠═d90e5e8c-36d0-47e4-bb4a-5344394a5005
+# ╠═62b3f081-096c-4892-98bd-6b264661fcaa
+# ╠═93a7ce70-445b-4704-bc3f-49965cd7fd56
+# ╠═7563dd79-45b7-4829-9c3f-299fe06bb638
+# ╠═53907b87-2262-43a6-9823-e85af8f1e5ca
+# ╠═89d9710c-d20f-4937-be38-ee5f8b775980
+# ╠═2a1ddf1d-df34-41f6-9a2a-7dab7ed1dd47
+# ╠═242ad05f-73ba-4a60-917d-1198f4ae90df
+# ╠═f0c9697e-c262-48d0-9a9b-8dc46979054d
+# ╠═d54c04f3-8473-439a-8ba8-29bdd78aa2e8
+# ╠═e0530fde-935d-4e3e-a233-7e115e6ee4b4
+# ╠═25309944-e77f-4b07-a0dc-9c3d3b91ba70
+# ╠═db2ffc3e-621e-4cb1-b7b8-335ccf6245b8
+# ╠═84fae587-ed76-403c-9085-9c0ebefb6386
+# ╠═c6da2cad-9058-4b04-91b8-366a073ac81a
+# ╠═a5698173-ff23-4d92-a77d-1e0835e009ab
+# ╠═c146ecbc-ee55-4560-a21f-c7566bc5a7dc
+# ╠═0ad8cec4-d364-42f3-a8b7-b5f03f3b7ccb
+# ╠═a54e430b-6efe-4de3-831e-40965bfca73c
+# ╠═73593762-3893-4bdf-8ce4-9776cb5df830
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
