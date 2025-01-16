@@ -5,6 +5,7 @@ using Turing
 using PyCall
 using Interpolations
 using HDF5
+using StatsPlots
 
 # Import the SWESolver class from the utils module
 @pyimport utils as pyutils
@@ -20,7 +21,7 @@ end
     # Define the prior for the bathymetry peak
     peak ~ Uniform(0, 10)
 
-    # Create an instance of the SWESolver
+    # Create SWE solver
     xbounds = (0., 10.)
     nx = 64
     tend = 10
@@ -30,11 +31,10 @@ end
     dealias = 3/2
 
     # Create SWE solver and calculate the solution
-    solver = pyutils.SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias)
+    solver = pyutils.SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias);
     # Use the solver to simulate the shallow water equation with the sampled peak
-    simulation_h, _, t = solver.solve(peak)
+    simulation_h, _, t = solver.solve(peak);
     x = solver.domain.x
-
 
     sim_interp = LinearInterpolation((t,x), simulation_h)
 
@@ -58,7 +58,7 @@ function load_observation_data(file_path::String)
         h = read(file["h"])
 
         obs_interpolated = LinearInterpolation((t, x), h')
-        sensor_pos = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]
+        sensor_pos = [2., 4., 6., 8.]
         t_measured = collect(0:0.1:10)
         observation_h = obs_interpolated.(t_measured, sensor_pos')
 
@@ -73,7 +73,10 @@ observation = load_observation_data(file_path)
 model = shallow_water_model(observation)
 
 # Sample from the posterior
-chain = sample(model, MH(), 3)
+chain = sample(model, MH(), 50)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
+
+plot(chain)
+savefig("./plots/mcmc_bathymetry_reco_chain.pdf")
 println(chain)
