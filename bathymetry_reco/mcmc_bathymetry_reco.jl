@@ -4,11 +4,11 @@ Pkg.activate(".")
 using Turing
 using PyCall
 using Interpolations
-using HDF5
 using StatsPlots
-
+using Serialization
 # Import the SWESolver class from the utils module
-@pyimport utils as pyutils
+@pyimport swe_wrapper as swe
+using HDF5 # Has to imported after my module otherwise pycall cannot find swe_wrapper
 
 struct observation_data
     t::Array{Float64}
@@ -19,8 +19,9 @@ end
 # Define the Turing model
 @model function shallow_water_model(observation::observation_data)
     # Define the prior for the bathymetry peak
+    println("Running the model")
     peak ~ Uniform(0, 10)
-
+    s ~ Uniform(0, 2)
     # Create SWE solver
     xbounds = (0., 10.)
     nx = 64
@@ -31,9 +32,9 @@ end
     dealias = 3/2
 
     # Create SWE solver and calculate the solution
-    solver = pyutils.SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias);
+    solver = swe.SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias);
     # Use the solver to simulate the shallow water equation with the sampled peak
-    simulation_h, _, t = solver.solve(peak);
+    simulation_h, _, t = solver.solve((peak, s));
     x = solver.domain.x
 
     sim_interp = LinearInterpolation((t,x), simulation_h)
@@ -73,10 +74,11 @@ observation = load_observation_data(file_path)
 model = shallow_water_model(observation)
 
 # Sample from the posterior
-chain = sample(model, MH(), 50)
+chain = sample(model, MH(), 1)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
 
+serialize("./data/results/chain_mu_s.jls", chain)
 plot(chain)
-savefig("./plots/mcmc_bathymetry_reco_chain.pdf")
+savefig("./plots/mcmc_bathymetry_reco_chain_mu_s.pdf")
 println(chain)

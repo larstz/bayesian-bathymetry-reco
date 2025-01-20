@@ -1,1 +1,3 @@
 Manifest.toml
+swe_wrapper.egg-info
+*.pyc
