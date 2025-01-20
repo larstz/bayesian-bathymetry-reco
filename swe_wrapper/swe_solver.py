@@ -2,7 +2,7 @@ import numpy as np
 import dedalus.public as d3
 from dedalus.core.domain import Domain
 
-def gaussian_bathymetry(x: np.ndarray, peak: float) -> np.ndarray:
+def gaussian_bathymetry(x: np.ndarray, params: tuple[float, float]) -> np.ndarray:
     """Gaussian bathymetry function.
     Args:
         x: The x-coordinate.
@@ -10,7 +10,7 @@ def gaussian_bathymetry(x: np.ndarray, peak: float) -> np.ndarray:
     Returns:
         The bathymetry value at x.
     """
-    return 0.2*np.exp(-(x-peak)**2)
+    return 0.2*np.exp(-1/params[1]*(x-params[0])**2)
 
 
 class CustomDomain:
@@ -136,7 +136,7 @@ class SWESolver():
         self.solver.solver.stop_iteration = int(self.tend/abs(self.dt))+1
         self.solver.solver.stop_sim_time = self.tend - 1e-13
 
-    def solve(self, peak: float):
+    def solve(self, params: tuple[float, float]):
         """Solve the shallow water equations.
         Args:
             peak: The peak of the Gaussian bathymetry.
@@ -153,10 +153,11 @@ class SWESolver():
         self.initial_conditions.h.change_scales(1)
         self.initial_conditions.u.change_scales(1)
 
-        self.initial_conditions.b['g'] = gaussian_bathymetry(self.domain.x, peak)
+        self.initial_conditions.b['g'] = gaussian_bathymetry(self.domain.x, params)
         self.initial_conditions.h['g'] = self.initial_conditions.H\
                                          - self.initial_conditions.b['g']
         self.initial_conditions.u['g'] = 0
+
 
         h_list = [np.copy(self.initial_conditions.h['g'])]
         u_list = [np.copy(self.initial_conditions.u['g'])]

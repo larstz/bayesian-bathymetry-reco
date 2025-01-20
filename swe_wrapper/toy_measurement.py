@@ -8,7 +8,7 @@ def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(current_dir)
     path = os.path.join(parent_dir, "data/toy_measurement")
-    filename = "simulation_data.h5"
+    filename = "simulation_data_mu_s.h5"
     full_path = os.path.join(path, filename)
 
     # Ensure the directory exists
@@ -16,13 +16,13 @@ def main():
 
     # Set up the parameters for measurement simulation (# for simulation in MCMC)
     xbounds = (0., 10.)
-    nx = 130 # 64
+    nx =  64
     tend = 10
-    timestep = 5e-5 # 1e-3
+    timestep = 1e-3
     g = 9.81
     kappa = 0.2
     dealias = 3/2
-    bathy_peak = 5
+    bathy_peak = (5,1)
 
     # Create SWE solver and calculate the solution
     solver = SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias)
