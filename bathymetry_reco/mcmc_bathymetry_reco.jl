@@ -21,7 +21,7 @@ end
     # Define the prior for the bathymetry peak
     println("Running the model")
     peak ~ Uniform(0, 10)
-    s ~ Uniform(0, 2)
+    s ~ Uniform(0.001, 2)
     # Create SWE solver
     xbounds = (0., 10.)
     nx = 64
@@ -62,6 +62,9 @@ function load_observation_data(file_path::String)
         sensor_pos = [2., 4., 6., 8.]
         t_measured = collect(0:0.1:10)
         observation_h = obs_interpolated.(t_measured, sensor_pos')
+        noise_dist = Normal(0, 0.1)
+        noise = rand(noise_dist, size(observation_h))
+        observation_h += noise
 
         return observation_data(collect(t_measured), sensor_pos, observation_h)
     end
@@ -74,7 +77,7 @@ observation = load_observation_data(file_path)
 model = shallow_water_model(observation)
 
 # Sample from the posterior
-chain = sample(model, MH(), 1)
+chain = sample(model, MH(), 1000, burnin=100)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
 
