@@ -20,9 +20,10 @@ end
 @model function shallow_water_model(observation::observation_data)
     # Define the prior for the bathymetry peak
     println("Running the model")
-    peak ~ Uniform(0, 10)
-    s ~ Uniform(0.001, 2)
+    #peak ~ Uniform(0, 10)
+    #s ~ Uniform(0.001, 2)
     # Create SWE solver
+    b ~ MvNormal(zeros(64), 1)
     xbounds = (0., 10.)
     nx = 64
     tend = 10
@@ -34,17 +35,17 @@ end
     # Create SWE solver and calculate the solution
     solver = swe.SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias);
     # Use the solver to simulate the shallow water equation with the sampled peak
-    simulation_h, _, t = solver.solve((peak, s));
+    #simulation_h, _, t = solver.solve((peak, s));
+    simulation_h, _, t = solver.solve(b);
     x = solver.domain.x
-
     sim_interp = LinearInterpolation((t,x), simulation_h)
 
     # interpolate values of the simulation to match the observation
     sim_observations = sim_interp.(observation.t, observation.x')
 
     # Compare the simulation with the observation
-    for i in eachindex(observation.h)
-        observation.h[i] ~ Normal(sim_observations[i], 0.1)
+    for i in 1:length(observation.t)
+        observation.h[i,:] ~ MvNormal(sim_observations[i,:], 0.01)
     end
 end
 
@@ -77,11 +78,11 @@ observation = load_observation_data(file_path)
 model = shallow_water_model(observation)
 
 # Sample from the posterior
-chain = sample(model, MH(), 1000, burnin=100)
+chain = sample(model, MH(), 50, burnin=10)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
 
-serialize("./data/results/chain_mu_s.jls", chain)
+serialize("./data/results/chain_soph.jls", chain)
 plot(chain)
-savefig("./plots/mcmc_bathymetry_reco_chain_mu_s.pdf")
+savefig("./plots/mcmc_bathymetry_reco_chain_soph.pdf")
 println(chain)

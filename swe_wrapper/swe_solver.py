@@ -136,7 +136,7 @@ class SWESolver():
         self.solver.solver.stop_iteration = int(self.tend/abs(self.dt))+1
         self.solver.solver.stop_sim_time = self.tend - 1e-13
 
-    def solve(self, params: tuple[float, float]):
+    def solve(self, b_array: np.ndarray):
         """Solve the shallow water equations.
         Args:
             peak: The peak of the Gaussian bathymetry.
@@ -153,7 +153,7 @@ class SWESolver():
         self.initial_conditions.h.change_scales(1)
         self.initial_conditions.u.change_scales(1)
 
-        self.initial_conditions.b['g'] = gaussian_bathymetry(self.domain.x, params)
+        self.initial_conditions.b['g'] = np.squeeze(b_array)
         self.initial_conditions.h['g'] = self.initial_conditions.H\
                                          - self.initial_conditions.b['g']
         self.initial_conditions.u['g'] = 0
