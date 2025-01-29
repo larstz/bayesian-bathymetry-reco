@@ -2,6 +2,7 @@ using Pkg
 Pkg.activate(".")
 
 using Turing
+using SliceSampling
 using PyCall
 using Interpolations
 using StatsPlots
@@ -36,7 +37,7 @@ end
 
     #b ~ MvNormal(zeros(64), 0.1*sigma)
     b ~ Product(fill(Uniform(0,0.2), sim_params.nx))
-    display(plot!(b, label=""))
+    #display(plot(b, label=""))
     if maximum(b) > 0.28
         Turing.@addlogprob! -Inf
         return nothing
@@ -73,7 +74,7 @@ function load_observation_data(file_path::String)
         t = read(file["t_array"])
         x = read(file["xgrid"])
         h = read(file["h"])
-
+        b = read(file["b_exact"])
         obs_interpolated = LinearInterpolation((t, x), h')
         sensor_pos = [2., 4., 6., 8.]
         t_measured = collect(0:0.1:10)
@@ -82,7 +83,7 @@ function load_observation_data(file_path::String)
         #noise = rand(noise_dist, size(observation_h))
         #observation_h += noise
 
-        return observation_data(collect(t_measured), sensor_pos, observation_h)
+        return observation_data(collect(t_measured), sensor_pos, observation_h),b
     end
 end
 
@@ -103,10 +104,10 @@ function create_laplace_matrix_1d(N)
     return L
 end
 
-save = true
+save = false
 
 file_path = "./data/toy_measurement/simulation_data.h5"
-observation = load_observation_data(file_path)
+observation, exact_b = load_observation_data(file_path)
 
 # Define the simulation parameters
 xbounds = (0., 10.)
@@ -124,17 +125,20 @@ sigma = 1/nx^2 .*inv(L)inv(L)'
 
 # Instantiate the model
 model = shallow_water_model(observation, sim_params; sigma=sigma)
-
+init_b = exact_b[2:2:end-1]
+init_b = rand(MvNormal(init_b, 0.01), 1)
+display(plot(init_b))
+readline()
 # Sample from the posterior
-n_samples = 50
-burnin = 1
-chain = sample(model, MH(), n_samples, burnin=burnin)
+n_samples = 10
+num_warmup = 0
+sampler = RandPermGibbs(SliceSteppingOut(2.))
+chain = sample(DynamicPPL.LogDensityFunction(model), MH(), n_samples, num_warmup=num_warmup, initial_params=init_b)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
-
 if save
-    serialize("./data/results/chain_soph_uniform.jls", chain)
-    plot(chain)
-    savefig("./plots/mcmc_bathymetry_reco_chain_soph_uniform.pdf")
-    println(chain)
+    serialize("./data/results/chain_test_init_noise.jls", chain)
+    #plot(chain)
+    #savefig("./plots/mcmc_bathymetry_reco_chain_soph_laplace_long_randpermgibbs.pdf")
+    #println(chain)
 end
