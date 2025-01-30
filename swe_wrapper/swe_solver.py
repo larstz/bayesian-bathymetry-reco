@@ -174,6 +174,10 @@ class SWESolver():
                 t_list.append(self.solver.solver.sim_time)
                 if np.max(self.initial_conditions.h['g']) > 100:
                     break
+
+        self.initial_conditions.b.change_scales(1)
+        self.initial_conditions.h.change_scales(1)
+        self.initial_conditions.u.change_scales(1)
         return np.array(h_list), np.array(u_list), np.array(t_list)
 
 def main():
