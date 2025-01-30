@@ -65,7 +65,7 @@ function mhsampler(model, n, initial_x; γ=0.1, burn_in=0)
         else
             logp_new = logjoint(x_new, model)
         end
-        if log(rand()) < logp_new - logp
+        if rand() < exp(logp_new - logp)
             println("Accepted")
             x = x_new
             logp = logp_new
@@ -122,7 +122,7 @@ loglikelihood(x) = sum(logpdf(Normal(0, 0.01), x))
 
 my_model = model(logprior, loglikelihood, observation, forward_model)
 
-chain = mhsampler(my_model, 4, init_b; burn_in=0, γ=0.05)
+chain = mhsampler(my_model, 4, init_b; burn_in=0, γ=0.01)
 display(plot(chain))
 if save
     serialize("./data/results/chain_test_init_noise_mymh.jls", chain)
