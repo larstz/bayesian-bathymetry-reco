@@ -74,11 +74,11 @@ observation = load_observation_data(file_path)
 model = shallow_water_model(observation)
 
 # Sample from the posterior
-chain = sample(model, MH(), 1)
+chain = sample(model, MH(), 100)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
 
-serialize("./data/results/chain_mu_s.jls", chain)
+serialize("./data/results/chain_mu_s_turing.jls", chain)
 plot(chain)
-savefig("./plots/mcmc_bathymetry_reco_chain_mu_s.pdf")
+savefig("./plots/mcmc_bathymetry_reco_chain_mu_s_turing.pdf")
 println(chain)
