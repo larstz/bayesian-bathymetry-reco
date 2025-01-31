@@ -91,11 +91,6 @@ class SWESolver():
 
     Methods:
         __init__: Initialize the SWESolver.
-        set_domain: Set the domain.
-        set_bathymetry: Set the bathymetry.
-        set_initial_conditions: Set the initial conditions.
-        set_boundary_conditions: Set the boundary conditions.
-        set_solver: Set the solver.
         solve: Solve the shallow water equations.
     """
 
@@ -107,34 +102,12 @@ class SWESolver():
         self.nx = nx
         self.tend = tend
         self.params = {'g': g, 'kappa': kappa, 'dealias': dealias}
-        self.domain = None
-        self.initial_conditions =None
-        self.solver = None
 
-    def set_domain(self):
-        """Set the domain."""
+        # Initialize domain, initial conditions, and solver
         self.domain = CustomDomain(self.xbound, self.nx, self.params['dealias'])
-
-    def set_initial_conditions(self, ):
-        """Set the initial conditions."""
-        if self.domain is None:
-            self.set_domain()
-
         self.initial_conditions = InitialConditions(self.domain, self.xbound)
-
-    def set_solver(self):
-        """Set the solver."""
-
-        if self.domain is None:
-            self.set_domain()
-
-        if self.initial_conditions is None:
-            self.set_initial_conditions()
-
         self.solver = Solver(self.domain, self.initial_conditions, self.params)
-        self.solver.solver.stop_wall_time = 15000
-        self.solver.solver.stop_iteration = int(self.tend/abs(self.dt))+1
-        self.solver.solver.stop_sim_time = self.tend - 1e-13
+
 
     def solve(self, b_array: np.ndarray):
         """Solve the shallow water equations.
@@ -146,8 +119,10 @@ class SWESolver():
             u_list: The list of velocity.
             t_list: The list of time.
         """
-        if self.solver is None:
-            self.set_solver()
+
+        self.solver.solver.stop_wall_time = 15000
+        self.solver.solver.stop_iteration = int(self.tend/abs(self.dt))+1
+        self.solver.solver.stop_sim_time = self.tend - 1e-13
 
         self.initial_conditions.b.change_scales(1)
         self.initial_conditions.h.change_scales(1)
@@ -158,11 +133,9 @@ class SWESolver():
                                          - self.initial_conditions.b['g']
         self.initial_conditions.u['g'] = 0
 
-
         h_list = [np.copy(self.initial_conditions.h['g'])]
         u_list = [np.copy(self.initial_conditions.u['g'])]
         t_list = [self.solver.solver.sim_time]
-
 
         while self.solver.solver.proceed:
             self.solver.solver.step(self.dt)
@@ -177,7 +150,7 @@ class SWESolver():
         return np.array(h_list), np.array(u_list), np.array(t_list)
 
 def main():
-
+    """Main function."""
     xmin = 0
     xmax = 10
     # Nx = 64

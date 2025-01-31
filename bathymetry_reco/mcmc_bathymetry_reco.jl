@@ -132,12 +132,11 @@ readline()
 # Sample from the posterior
 n_samples = 10
 num_warmup = 0
-sampler = RandPermGibbs(SliceSteppingOut(2.))
-chain = sample(DynamicPPL.LogDensityFunction(model), MH(), n_samples, num_warmup=num_warmup, initial_params=init_b)
+chain = sample(model, MH(0.1*I(nx)), n_samples, num_warmup=num_warmup, initial_params=init_b)
 # Because the solver is written in python we need a gradient free sampler like MH
 # Print the results
 if save
-    serialize("./data/results/chain_test_init_noise.jls", chain)
+    serialize("./data/results/chain_test_init_noise_turing.jls", chain)
     #plot(chain)
     #savefig("./plots/mcmc_bathymetry_reco_chain_soph_laplace_long_randpermgibbs.pdf")
     #println(chain)
