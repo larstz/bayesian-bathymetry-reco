@@ -99,9 +99,6 @@ function load_observation_data(file_path::String)
         # noise_dist = Normal(0, 0.01)
         # noise = rand(noise_dist, size(observation_H))
         # observation_H += noise
-        plot(x,H[:,1], label="H")
-        plot!(x,b, label="b")
-        display(scatter!(sensor_pos, observation_H[1,:], label="Observed"))
         return observation_data(collect(t_measured), sensor_pos, observation_H),b
     end
 end
@@ -146,15 +143,20 @@ my_model = model(logprior, loglikelihood, observation, forward_model)
 init_b = config["sampler"]["initial"]
 
 chain = mhsampler(my_model, n_samples, init_b; burn_in=burnin, γ=γ)
-display(plot(chain))
-readline()
 
 if save
     mkpath(target_dir)
     cd(target_dir)
+
+    # Serialize the chain
     serialize("chain_p.jls", chain)
-    plot(chain, label=["μ" "σ²" "scale"], title="Chain for μ₀=4.5 and σ²₀=1 scale=0.2", xlabel="Iteration", ylabel="Value")
+
+    # store the configuration file for reproducibility
+    open("config_copy.toml", "w") do io
+        TOML.print(io, config)
+    end
+    # Plot the chain
+    plot(chain; label=["μ" "σ²" "scale"], title="Chain for μ₀=4.5 and σ²₀=1 scale=0.2", xlabel="Iteration", ylabel="Value")
     mkpath("./plots")
     savefig("./plots/chain.pdf")
-    #println(chain)
 end
