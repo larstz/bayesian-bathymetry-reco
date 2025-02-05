@@ -3,6 +3,7 @@ Pkg.activate(".")
 
 using Turing
 using TOML
+using Dates
 using PyCall
 using Interpolations
 using StatsPlots
@@ -39,13 +40,13 @@ function bathymetry(x::Array{Float64,1}, μ::Float64, σ²::Float64=1., scale::F
     return scale * exp.(-1/σ² .*(x .- μ).^2)
 end
 
-function logjoint(x, model)
+function logjoint(x, observation::observation_data)
     log_prior = logprior(x...)
     if log_prior == -Inf
         return -Inf
     end
     sim_observations = forward_model(x)
-    log_likelihood = sum(loglikelihood(sim_observations - model.observation.h))
+    log_likelihood = sum(loglikelihood(sim_observations - observation.h))
     return log_prior + log_likelihood
 end
 
@@ -62,16 +63,16 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
     return sim_observations
 end
 
-function mhsampler(model, n, initial_x; γ=0.1, burn_in=0)
+function mhsampler(observation, n, initial_x; γ=0.1, burn_in=0)
     chain = zeros(n-burn_in, length(initial_x))
     x = initial_x
-    logp = logjoint(x, model)
+    logp = logjoint(x, observation)
     for i in ProgressBar(1:n)
         x_new = x + rand(Normal(0,γ), size(x))
         # if x_new[2] < 0 || x_new[1] < 0 || x_new[1] > 10
         #     logp_new = -Inf
         # else
-            logp_new = logjoint(x_new, model)
+            logp_new = logjoint(x_new, observation)
         # end
         if rand() < exp(logp_new - logp)
             x = x_new
@@ -85,7 +86,7 @@ function mhsampler(model, n, initial_x; γ=0.1, burn_in=0)
 end
 
 
-function load_observation_data(file_path::String)
+function load_observation_data(file_path::String, noise_var::Float64=0.0)
     h5open(file_path, "r") do file
         t = read(file["t_array"])
         x = read(file["xgrid"])
@@ -96,9 +97,8 @@ function load_observation_data(file_path::String)
         sensor_pos = [2., 4., 6., 8.]
         t_measured = collect(0:0.1:10)
         observation_H = obs_interpolated.(t_measured, sensor_pos')
-        # noise_dist = Normal(0, 0.01)
-        # noise = rand(noise_dist, size(observation_H))
-        # observation_H += noise
+        noise = noise_var > 0 ? rand(Normal(0, noise_var), size(observation_H)) : zeros(size(observation_H))
+        observation_H += noise
         return observation_data(collect(t_measured), sensor_pos, observation_H),b
     end
 end
@@ -116,9 +116,9 @@ dealias = config["simulation"]["dealias"]
 sim_params = simulation_setup(xbounds, timestep, nx, tend, g, kappa, dealias)
 
 save = config["output"]["save"]
-target_dir = config["output"]["path"]
+target_dir = config["output"]["path"]*Dates.format(now(), "Y-mm-dd-HH-MM-SS")
 
-observation, exact_b = load_observation_data(config["observation"]["path"])
+observation, exact_b = load_observation_data(config["observation"]["path"], config["observation"]["noise_var"])
 
 # Instantiate the model
 #init_b = exact_b[2:2:end-1]
@@ -138,11 +138,9 @@ logprior(μ::Float64, σ²::Float64) = logprior(μ) + logpdf(Uniform(0, 2),σ²)
 logprior(μ::Float64, σ²::Float64, s::Float64) = logprior(μ, σ²) + logpdf(Uniform(0.1, 0.25), s)
 loglikelihood(x::Array{Float64}) = logpdf(Normal(0, likelihood_σ), x)
 
-my_model = model(logprior, loglikelihood, observation, forward_model)
-
 init_b = config["sampler"]["initial"]
 
-chain = mhsampler(my_model, n_samples, init_b; burn_in=burnin, γ=γ)
+chain = mhsampler(observation, n_samples, init_b; burn_in=burnin, γ=γ)
 
 if save
     mkpath(target_dir)
