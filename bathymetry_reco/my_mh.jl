@@ -2,6 +2,7 @@ using Pkg
 Pkg.activate(".")
 
 using Turing
+using TOML
 using PyCall
 using Interpolations
 using StatsPlots
@@ -18,7 +19,7 @@ struct observation_data
 end
 
 struct simulation_setup
-    xbounds::Tuple{Float64, Float64}
+    xbounds::Array{Float64, 1}
     timestep::Float64
     nx::Int
     tend::Float64
@@ -34,17 +35,17 @@ struct model
     forward_model
 end
 
-function bathymetry(x::Array{Float64,1}, params::Tuple{Float64, Float64, Float64})
-    return params[3] * exp.(-params[2] * (x .- params[1]).^2)
+function bathymetry(x::Array{Float64,1}, μ::Float64, σ²::Float64=1., scale::Float64=0.2)
+    return scale * exp.(-1/σ² .*(x .- μ).^2)
 end
 
 function logjoint(x, model)
-    log_prior = sum(model.logprior(x))
+    log_prior = logprior(x...)
     if log_prior == -Inf
         return -Inf
     end
-    sim_observations = model.forward_model(x)
-    log_likelihood = sum(model.ll(sim_observations - model.observation.h))
+    sim_observations = forward_model(x)
+    log_likelihood = sum(loglikelihood(sim_observations - model.observation.h))
     return log_prior + log_likelihood
 end
 
@@ -52,7 +53,7 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
     solver = swe.SWESolver(sim_params.xbounds, sim_params.timestep,
                             sim_params.nx, sim_params.tend, sim_params.g,
                             sim_params.kappa, sim_params.dealias);
-    sample_bathy = bathymetry(solver.domain.x, Tuple(param))
+    sample_bathy = bathymetry(solver.domain.x, param...)
     simulation_h, _, t = solver.solve(sample_bathy)
     simulation_H = simulation_h .+ sample_bathy'
     x = solver.domain.x
@@ -67,11 +68,11 @@ function mhsampler(model, n, initial_x; γ=0.1, burn_in=0)
     logp = logjoint(x, model)
     for i in ProgressBar(1:n)
         x_new = x + rand(Normal(0,γ), size(x))
-        if x_new[2] < 0 || x_new[1] < 0 || x_new[1] > 10
-            logp_new = -Inf
-        else
+        # if x_new[2] < 0 || x_new[1] < 0 || x_new[1] > 10
+        #     logp_new = -Inf
+        # else
             logp_new = logjoint(x_new, model)
-        end
+        # end
         if rand() < exp(logp_new - logp)
             x = x_new
             logp = logp_new
@@ -95,9 +96,9 @@ function load_observation_data(file_path::String)
         sensor_pos = [2., 4., 6., 8.]
         t_measured = collect(0:0.1:10)
         observation_H = obs_interpolated.(t_measured, sensor_pos')
-        noise_dist = Normal(0, 0.01)
-        noise = rand(noise_dist, size(observation_H))
-        observation_H += noise
+        # noise_dist = Normal(0, 0.01)
+        # noise = rand(noise_dist, size(observation_H))
+        # observation_H += noise
         plot(x,H[:,1], label="H")
         plot!(x,b, label="b")
         display(scatter!(sensor_pos, observation_H[1,:], label="Observed"))
@@ -105,40 +106,55 @@ function load_observation_data(file_path::String)
     end
 end
 
+config = TOML.parsefile("config.toml")
+
 # Define the simulation parameters
-xbounds = (0., 10.)
-nx =  64
-tend = 10
-timestep = 1e-3
-g = 9.81
-kappa = 0.2
-dealias = 3/2
+xbounds = config["simulation"]["xbounds"]
+timestep = config["simulation"]["timestep"]
+nx = config["simulation"]["nx"]
+tend = config["simulation"]["tend"]
+g = config["simulation"]["g"]
+kappa = config["simulation"]["kappa"]
+dealias = config["simulation"]["dealias"]
 sim_params = simulation_setup(xbounds, timestep, nx, tend, g, kappa, dealias)
 
-save = true
+save = config["output"]["save"]
+target_dir = config["output"]["path"]
 
-file_path = "./data/toy_measurement/simulation_data.h5"
-observation, exact_b = load_observation_data(file_path)
+observation, exact_b = load_observation_data(config["observation"]["path"])
 
 # Instantiate the model
 #init_b = exact_b[2:2:end-1]
 #init_b = rand(MvNormal(init_b, 0.01), 1)
 #display(plot(init_b))
 
+# Define parameters for MH sampler
+
+γ = config["sampler"]["stepsize"] # stepsize
+likelihood_σ = config["sampler"]["likelihood_var"] # likelihood variance
+n_samples = config["sampler"]["n_samples"] # number of samples
+burnin = config["sampler"]["burnin"] # burnin
+
 forward_model(params) = simulation(params, sim_params, observation)
-logprior(x) = sum(logpdf(Uniform(0, 10), x[1])) + sum(logpdf(Uniform(0, 2), x[2]) + logpdf(Uniform(0.1, 0.25), x[3]))
-loglikelihood(x) = sum(logpdf(Normal(0, 0.01), x))
+logprior(μ::Float64) = logpdf(Uniform(0, 10), μ)
+logprior(μ::Float64, σ²::Float64) = logprior(μ) + logpdf(Uniform(0, 2),σ²)
+logprior(μ::Float64, σ²::Float64, s::Float64) = logprior(μ, σ²) + logpdf(Uniform(0.1, 0.25), s)
+loglikelihood(x::Array{Float64}) = logpdf(Normal(0, likelihood_σ), x)
 
 my_model = model(logprior, loglikelihood, observation, forward_model)
 
-init_b = [4.5,0.5, 0.1]
-n_samples = 1000
+init_b = config["sampler"]["initial"]
 
-chain = mhsampler(my_model, n_samples, init_b; burn_in=0, γ=0.1)
+chain = mhsampler(my_model, n_samples, init_b; burn_in=burnin, γ=γ)
 display(plot(chain))
+readline()
+
 if save
-    serialize("./data/results/chain_test_p_s_s_mymh_noisy_obs_H_long.jls", chain)
-    plot(chain, label=["μ" "σ²" "scale"], title="Chain for μ₀=4.5 and σ²₀=0.5 scale=0.25", xlabel="Iteration", ylabel="Value")
-    savefig("./plots/chain_test_p_s_s_mymh_noisy_obs_H_long.pdf")
+    mkpath(target_dir)
+    cd(target_dir)
+    serialize("chain_p.jls", chain)
+    plot(chain, label=["μ" "σ²" "scale"], title="Chain for μ₀=4.5 and σ²₀=1 scale=0.2", xlabel="Iteration", ylabel="Value")
+    mkpath("./plots")
+    savefig("./plots/chain.pdf")
     #println(chain)
 end

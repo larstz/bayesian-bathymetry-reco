@@ -1,6 +1,7 @@
 import numpy as np
 import dedalus.public as d3
 from dedalus.core.domain import Domain
+from time import time
 
 def gaussian_bathymetry(x: np.ndarray, params: tuple[float, float]) -> np.ndarray:
     """Gaussian bathymetry function.
@@ -151,20 +152,22 @@ class SWESolver():
 
 def main():
     """Main function."""
-    xmin = 0
-    xmax = 10
-    # Nx = 64
-    Nx = 130
-    T = 10
-    timestep = 5e-5
-    N = int(T/abs(timestep))+1
+    xbounds = (0., 10.)
+    nx =  64
+    tend = 10
+    timestep = 1e-3
     g = 9.81
     kappa = 0.2
     dealias = 3/2
 
-    solver = SWESolver((xmin, xmax), timestep, Nx, T, g, kappa, dealias)
+    solver = SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias)
+    b = gaussian_bathymetry(solver.domain.x, (5., 1.))
 
-    h_list, u_list, t_list = solver.solve(5)
+    # time the solver
+    start = time()
+    h_list, u_list, t_list = solver.solve(b)
+    end = time()
+    print(f"Time taken: {end-start}")
     print(f"Number of time steps: {len(t_list)}")
 
 
