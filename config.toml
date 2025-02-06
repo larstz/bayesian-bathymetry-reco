@@ -10,10 +10,11 @@ kappa = 0.2
 dealias = 1.5
 
 [sampler]
+parametrized = false
 initial = [4.5, 0.5]
-stepsize = 0.01
+stepsize = 0.1
 likelihood_var = 0.01
-n_samples = 1000
+n_samples = 10
 burnin = 0
 
 [observation]
@@ -21,5 +22,5 @@ path = "./data/toy_measurement/simulation_data.h5"
 noise_var = 0.0
 
 [output]
-save = true
+save = false
 path = "./data/results/experiment_"

@@ -40,8 +40,10 @@ function bathymetry(x::Array{Float64,1}, μ::Float64, σ²::Float64=1., scale::F
     return scale * exp.(-1/σ² .*(x .- μ).^2)
 end
 
+bathymetry(x::Array{Float64,1}, params::Array{Float64,1}) = length(params)>3 ? params : bathymetry(x, params...)
+
 function logjoint(x, observation::observation_data)
-    log_prior = logprior(x...)
+    log_prior = logprior(x)
     if log_prior == -Inf
         return -Inf
     end
@@ -54,7 +56,7 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
     solver = swe.SWESolver(sim_params.xbounds, sim_params.timestep,
                             sim_params.nx, sim_params.tend, sim_params.g,
                             sim_params.kappa, sim_params.dealias);
-    sample_bathy = bathymetry(solver.domain.x, param...)
+    sample_bathy = bathymetry(solver.domain.x, param)
     simulation_h, _, t = solver.solve(sample_bathy)
     simulation_H = simulation_h .+ sample_bathy'
     x = solver.domain.x
@@ -133,12 +135,18 @@ n_samples = config["sampler"]["n_samples"] # number of samples
 burnin = config["sampler"]["burnin"] # burnin
 
 forward_model(params) = simulation(params, sim_params, observation)
+
+logprior(params::Array{Float64,1}) = length(params)>3 ? sum(logpdf(Uniform(0,0.21),params)) : logprior(params...)
 logprior(μ::Float64) = logpdf(Uniform(0, 10), μ)
 logprior(μ::Float64, σ²::Float64) = logprior(μ) + logpdf(Uniform(0, 2),σ²)
 logprior(μ::Float64, σ²::Float64, s::Float64) = logprior(μ, σ²) + logpdf(Uniform(0.1, 0.25), s)
 loglikelihood(x::Array{Float64}) = logpdf(Normal(0, likelihood_σ), x)
 
-init_b = config["sampler"]["initial"]
+if config["sampler"]["parametrized"]
+    init_b = config["sampler"]["initial"]
+else
+    init_b = exact_b[2:2:end-1]
+end
 
 chain = mhsampler(observation, n_samples, init_b; burn_in=burnin, γ=γ)
 
@@ -154,7 +162,7 @@ if save
         TOML.print(io, config)
     end
     # Plot the chain
-    plot(chain; label=["μ" "σ²" "scale"], title="Chain for μ₀=4.5 and σ²₀=1 scale=0.2", xlabel="Iteration", ylabel="Value")
+    plot(chain; label=["μ" "σ²" "scale"], title="Chain for μ₀=4.5 and σ²₀=0.5 scale=0.2", xlabel="Iteration", ylabel="Value")
     mkpath("./plots")
     savefig("./plots/chain.pdf")
 end
