@@ -37,7 +37,7 @@ struct model
 end
 
 function bathymetry(x::Array{Float64,1}, μ::Float64, σ²::Float64=1., scale::Float64=0.2)
-    return scale * exp.(-1/σ² .*(x .- μ).^2)
+    return scale * exp.(-1/(σ²+1e-16) .*(x .- μ).^2)
 end
 
 bathymetry(x::Array{Float64,1}, params::Array{Float64,1}) = length(params)>3 ? params : bathymetry(x, params...)
