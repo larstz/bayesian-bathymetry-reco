@@ -1,6 +1,7 @@
 import numpy as np
 import dedalus.public as d3
 from dedalus.core.domain import Domain
+from time import time
 
 def gaussian_bathymetry(x: np.ndarray, params: tuple[float, float]) -> np.ndarray:
     """Gaussian bathymetry function.
@@ -91,11 +92,6 @@ class SWESolver():
 
     Methods:
         __init__: Initialize the SWESolver.
-        set_domain: Set the domain.
-        set_bathymetry: Set the bathymetry.
-        set_initial_conditions: Set the initial conditions.
-        set_boundary_conditions: Set the boundary conditions.
-        set_solver: Set the solver.
         solve: Solve the shallow water equations.
     """
 
@@ -107,36 +103,14 @@ class SWESolver():
         self.nx = nx
         self.tend = tend
         self.params = {'g': g, 'kappa': kappa, 'dealias': dealias}
-        self.domain = None
-        self.initial_conditions =None
-        self.solver = None
 
-    def set_domain(self):
-        """Set the domain."""
+        # Initialize domain, initial conditions, and solver
         self.domain = CustomDomain(self.xbound, self.nx, self.params['dealias'])
-
-    def set_initial_conditions(self, ):
-        """Set the initial conditions."""
-        if self.domain is None:
-            self.set_domain()
-
         self.initial_conditions = InitialConditions(self.domain, self.xbound)
-
-    def set_solver(self):
-        """Set the solver."""
-
-        if self.domain is None:
-            self.set_domain()
-
-        if self.initial_conditions is None:
-            self.set_initial_conditions()
-
         self.solver = Solver(self.domain, self.initial_conditions, self.params)
-        self.solver.solver.stop_wall_time = 15000
-        self.solver.solver.stop_iteration = int(self.tend/abs(self.dt))+1
-        self.solver.solver.stop_sim_time = self.tend - 1e-13
 
-    def solve(self, params: tuple[float, float]):
+
+    def solve(self, b_array: np.ndarray):
         """Solve the shallow water equations.
         Args:
             peak: The peak of the Gaussian bathymetry.
@@ -146,23 +120,23 @@ class SWESolver():
             u_list: The list of velocity.
             t_list: The list of time.
         """
-        if self.solver is None:
-            self.set_solver()
+
+        self.solver.solver.stop_wall_time = 15000
+        self.solver.solver.stop_iteration = int(self.tend/abs(self.dt))+1
+        self.solver.solver.stop_sim_time = self.tend - 1e-13
 
         self.initial_conditions.b.change_scales(1)
         self.initial_conditions.h.change_scales(1)
         self.initial_conditions.u.change_scales(1)
 
-        self.initial_conditions.b['g'] = gaussian_bathymetry(self.domain.x, params)
+        self.initial_conditions.b['g'] = np.squeeze(b_array)
         self.initial_conditions.h['g'] = self.initial_conditions.H\
                                          - self.initial_conditions.b['g']
         self.initial_conditions.u['g'] = 0
 
-
         h_list = [np.copy(self.initial_conditions.h['g'])]
         u_list = [np.copy(self.initial_conditions.u['g'])]
         t_list = [self.solver.solver.sim_time]
-
 
         while self.solver.solver.proceed:
             self.solver.solver.step(self.dt)
@@ -181,21 +155,23 @@ class SWESolver():
         return np.array(h_list), np.array(u_list), np.array(t_list)
 
 def main():
-
-    xmin = 0
-    xmax = 10
-    # Nx = 64
-    Nx = 130
-    T = 10
-    timestep = 5e-5
-    N = int(T/abs(timestep))+1
+    """Main function."""
+    xbounds = (0., 10.)
+    nx =  64
+    tend = 10
+    timestep = 1e-3
     g = 9.81
     kappa = 0.2
     dealias = 3/2
 
-    solver = SWESolver((xmin, xmax), timestep, Nx, T, g, kappa, dealias)
+    solver = SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias)
+    b = gaussian_bathymetry(solver.domain.x, (5., 1.))
 
-    h_list, u_list, t_list = solver.solve(5)
+    # time the solver
+    start = time()
+    h_list, u_list, t_list = solver.solve(b)
+    end = time()
+    print(f"Time taken: {end-start}")
     print(f"Number of time steps: {len(t_list)}")
 
 

@@ -1,0 +1,26 @@
+title = "MH Bathymetry Reco setup"
+
+[simulation]
+xbounds = [0.0, 10.0]
+timestep = 1e-3
+nx =  64
+tend = 10
+g = 9.81
+kappa = 0.2
+dealias = 1.5
+
+[sampler]
+parametrized = false
+initial = [4.5, 0.5]
+stepsize = 0.1
+likelihood_var = 0.01
+n_samples = 10
+burnin = 0
+
+[observation]
+path = "./data/toy_measurement/simulation_data.h5"
+noise_var = 0.0
+
+[output]
+save = false
+path = "./data/results/experiment_"
