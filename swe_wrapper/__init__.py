@@ -1,1 +1,1 @@
-from .swe_solver import SWESolver
+from .swe_solver import SWESolver, rampFunc, gaussian_bathymetry
