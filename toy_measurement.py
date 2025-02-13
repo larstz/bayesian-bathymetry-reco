@@ -9,8 +9,7 @@ def main():
     for reconstruction of bathymetry."""
     # Get the parent directory of the current file
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
-    path = os.path.join(parent_dir, "data/toy_measurement")
+    path = os.path.join(current_dir, "data/toy_measurement")
 
 
     # Ensure the directory exists
@@ -37,19 +36,15 @@ def main():
     H_sensor, h_array, t_array, u_array = solver.solve(bathy)
     print("Simulation Done")
     dx = (xbounds[1]-xbounds[0])/nx
-    print("dx: ", dx)
-    H_array = h_array + np.tile(bathy, (t_array.size, 1))
-
     # filename
     filename = f"simulation_data_{problemtype}.h5"
     full_path = os.path.join(path, filename)
     print("Saving results to: ", full_path)
     with h5py.File(full_path, "w") as f:
-        f.create_dataset("y", data=H_array)
         f.create_dataset("h", data=h_array)
         f.create_dataset("u", data=u_array)
         f.create_dataset("H_sensor", data=H_sensor)
-        f.create_dataset("b_exact", data=b_array)
+        f.create_dataset("b_exact", data=bathy)
         f.create_dataset("xgrid", data=np.copy(solver.domain.x))
         f.create_dataset("t_array", data=t_array)
         f.attrs["T_N"] = total_t
