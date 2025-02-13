@@ -5,17 +5,18 @@ from scipy.interpolate import CubicSpline
 class leftbc(object):
 
     def __init__(self, filename):
-        heights = []
+        self.heights = []
         time    = 0
         with open(filename, 'r') as f:
             for line in f.readlines()[1:]:
                 fields = line.split()
-                heights.append(float(fields[0])/100) # convert from cm to m
+                self.heights.append(float(fields[0])/100) # convert from cm to m
                 time += 0.01 # sampling rate in seconds
-        nt =  np.shape(heights)[0]
+        nt =  np.shape(self.heights)[0]
         taxis = np.linspace(0.0, time, nt)
         self.final_time = time
-        self.f = CubicSpline(taxis, heights)
+        self.f = CubicSpline(taxis, self.heights)
+        self.heights = np.array(self.heights)
 
 
 class data(object):
@@ -43,3 +44,21 @@ class data(object):
         self.f = []
         for j in range(3):
             self.f.append(CubicSpline(taxis, heights[:,j]))
+
+def main():
+    data_dir = "experiment_data/Data_Sensors_orig/With_Bathymetry"
+    bc_array = np.zeros((10000, 20))
+    for i in range(1, 21):
+        print("Reading file: ", i)
+        filename = data_dir + f"/Heat{i}.txt"
+        bc = leftbc(filename)
+        bc_array[:,i-1] = bc.heights*100
+
+    mean_bc = np.mean(bc_array, axis=1)
+    with open(data_dir + "/mean_bc.txt", 'w') as f:
+        f.write("Sensor 1 [cm] \n")
+        for i in range(10000):
+            f.write(f"{mean_bc[i]}\n")
+
+if __name__ == "__main__":
+    main()

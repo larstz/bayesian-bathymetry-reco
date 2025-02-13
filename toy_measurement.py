@@ -1,58 +1,65 @@
 import os
 import h5py
 import numpy as np
-from swe_solver import SWESolver
+from swe_wrapper import SWESolver, rampFunc
+
 
 def main():
+    """This script is used to generate the simulation data to use
+    for reconstruction of bathymetry."""
     # Get the parent directory of the current file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(current_dir)
     path = os.path.join(parent_dir, "data/toy_measurement")
-    filename = "simulation_data_mu_s.h5"
-    full_path = os.path.join(path, filename)
+
 
     # Ensure the directory exists
     os.makedirs(path, exist_ok=True)
 
     # Set up the parameters for measurement simulation (# for simulation in MCMC)
-    xbounds = (0., 10.)
-    nx =  64
-    tend = 10
-    timestep = 1e-3
+    xbounds = (1.5, 15.)
+    nx =  130
+    total_t = 10
+    tstart = 32.
+    timestep = 5e-5
     g = 9.81
     kappa = 0.2
     dealias = 3/2
-    bathy_peak = (5,1)
+    problemtype = "waterchannel"
 
     # Create SWE solver and calculate the solution
-    solver = SWESolver(xbounds, timestep, nx, tend, g, kappa, dealias)
-    h_list, u_list, t_list = solver.solve(bathy_peak)
-
-    h_array = np.array(h_list)
-    u_array = np.array(u_list)
-    t_array = np.array(t_list)
-    solver.initial_conditions.b.change_scales(1)
-    b_array = np.copy(solver.initial_conditions.b['g'])
+    solver = SWESolver(xbounds, timestep, nx, total_t,
+                       tstart=tstart, g=g, kappa=kappa, dealias=dealias,
+                       problemtype=problemtype)
+    x = solver.domain.x
+    bathy = rampFunc(x)
+    print("Start Simulation")
+    H_sensor, h_array, t_array, u_array = solver.solve(bathy)
+    print("Simulation Done")
     dx = (xbounds[1]-xbounds[0])/nx
-    H_array = h_array + np.tile(b_array, (t_array.size, 1))
+    print("dx: ", dx)
+    H_array = h_array + np.tile(bathy, (t_array.size, 1))
 
-
+    # filename
+    filename = f"simulation_data_{problemtype}.h5"
+    full_path = os.path.join(path, filename)
+    print("Saving results to: ", full_path)
     with h5py.File(full_path, "w") as f:
-
         f.create_dataset("y", data=H_array)
         f.create_dataset("h", data=h_array)
         f.create_dataset("u", data=u_array)
+        f.create_dataset("H_sensor", data=H_sensor)
         f.create_dataset("b_exact", data=b_array)
         f.create_dataset("xgrid", data=np.copy(solver.domain.x))
         f.create_dataset("t_array", data=t_array)
-        f.attrs["T_N"] = tend
+        f.attrs["T_N"] = total_t
         f.attrs["xmin"] = xbounds[0]
         f.attrs["xmax"] = xbounds[1]
+        f.attrs["tstart"] = tstart
         f.attrs["dt"] = timestep
         f.attrs["dx"] = dx
         f.attrs["g"] = g
-        f.attrs["k"] = kappa  # Leave this "k" in hdf5 file,
-        # otherwise compute all old solutions again.
+        f.attrs["k"] = kappa
         f.attrs["M"] = nx
 
 if __name__ == "__main__":

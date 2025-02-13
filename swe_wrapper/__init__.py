@@ -1,2 +1,1 @@
-from .swe_solver import SWESolver
-from .read_left_bc import leftbc, data
+from .swe_solver import SWESolver, rampFunc, gaussian_bathymetry
