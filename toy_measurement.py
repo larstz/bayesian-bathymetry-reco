@@ -1,7 +1,7 @@
 import os
 import h5py
 import numpy as np
-from swe_wrapper import SWESolver, rampFunc
+from swe_wrapper import SWESolver, rampFunc, gaussian_bathymetry
 
 
 def main():
@@ -25,19 +25,21 @@ def main():
     kappa = 0.2
     dealias = 3/2
     problemtype = "waterchannel"
-
+    problem_bathy = "two_gaussian"
+    peak1 = (5, 0.5)
+    peak2 = (10.5, 1)
     # Create SWE solver and calculate the solution
     solver = SWESolver(xbounds, timestep, nx, total_t,
                        tstart=tstart, g=g, kappa=kappa, dealias=dealias,
                        problemtype=problemtype)
     x = solver.domain.x
-    bathy = rampFunc(x)
+    bathy = gaussian_bathymetry(x, peak1) + gaussian_bathymetry(x, peak2)
     print("Start Simulation")
-    H_sensor, h_array, t_array, u_array = solver.solve(bathy)
+    H_sensor, t_array, h_array, u_array = solver.solve(bathy)
     print("Simulation Done")
     dx = (xbounds[1]-xbounds[0])/nx
     # filename
-    filename = f"simulation_data_{problemtype}.h5"
+    filename = f"simulation_data_{problemtype}_{problem_bathy}.h5"
     full_path = os.path.join(path, filename)
     print("Saving results to: ", full_path)
     with h5py.File(full_path, "w") as f:
@@ -56,6 +58,8 @@ def main():
         f.attrs["g"] = g
         f.attrs["k"] = kappa
         f.attrs["M"] = nx
+        f.attrs["gaussian1"] = peak1
+        f.attrs["gaussian2"] = peak2
 
 if __name__ == "__main__":
     main()
