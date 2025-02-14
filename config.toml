@@ -1,13 +1,14 @@
 title = "MH Bathymetry Reco setup"
 
 [simulation]
-xbounds = [0.0, 10.0]
+xbounds = [1.5, 15.0]
 timestep = 1e-3
-nx =  64
+nx =  100
 tend = 10
 g = 9.81
 kappa = 0.2
 dealias = 1.5
+scenario = "waterchannel"
 
 [sampler]
 parametrized = true
@@ -18,7 +19,7 @@ n_samples = 1000
 burnin = 0
 
 [observation]
-path = "./data/toy_measurement/simulation_data.h5"
+path = "./data/toy_measurement/simulation_data_waterchannel_one_gaussian.h5"
 noise_var = 0.0
 
 [output]

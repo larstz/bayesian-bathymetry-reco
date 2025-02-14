@@ -1,0 +1,27 @@
+title = "MH Bathymetry Reco setup"
+
+[output]
+save = true
+path = "./data/results/experiment_"
+
+[simulation]
+xbounds = [1.5, 15.0]
+nx = 100
+g = 9.81
+scenario = "waterchannel"
+timestep = 0.001
+kappa = 0.2
+tend = 10
+dealias = 1.5
+
+[observation]
+noise_var = 0.0
+path = "./data/toy_measurement/simulation_data_waterchannel_one_gaussian.h5"
+
+[sampler]
+stepsize = 0.1
+likelihood_var = 0.001
+n_samples = 10
+initial = [0.0, 0.0]
+burnin = 0
+parametrized = true

@@ -16,7 +16,8 @@ using ProgressBars
 struct observation_data
     t::Array{Float64}
     x::Array{Float64}
-    h::Array{Float64}
+    H::Array{Float64}
+    tstart::Float64
 end
 
 struct simulation_setup
@@ -27,6 +28,7 @@ struct simulation_setup
     g::Float64
     kappa::Float64
     dealias::Float64
+    scenario::String
 end
 
 struct model
@@ -48,20 +50,20 @@ function logjoint(x, observation::observation_data)
         return -Inf
     end
     sim_observations = forward_model(x)
-    log_likelihood = sum(loglikelihood(sim_observations - observation.h))
+    log_likelihood = sum(loglikelihood(sim_observations - observation.H))
     return log_prior + log_likelihood
 end
 
 function simulation(param, sim_params::simulation_setup, observation::observation_data)
     solver = swe.SWESolver(sim_params.xbounds, sim_params.timestep,
-                            sim_params.nx, sim_params.tend, sim_params.g,
-                            sim_params.kappa, sim_params.dealias);
+                            sim_params.nx, sim_params.tend, g=sim_params.g,
+                            kappa=sim_params.kappa, dealias=sim_params.dealias,
+                            tstart=observation.tstart,
+                            problemtype=sim_params.scenario);
     sample_bathy = bathymetry(solver.domain.x, param)
-    simulation_h, _, t = solver.solve(sample_bathy)
-    simulation_H = simulation_h .+ sample_bathy'
-    x = solver.domain.x
-    sim_interp = LinearInterpolation((t,x), simulation_H)
-    sim_observations = sim_interp.(observation.t, observation.x')
+    sim_observations, t, _, _ = solver.solve(sample_bathy)
+    obs_itp = [LinearInterpolation(t, H_sensor) for H_sensor in eachcol(sim_observations)]
+    sim_observations = hcat([obs_itp_i.(observation.t) for obs_itp_i in obs_itp]...)
     return sim_observations
 end
 
@@ -91,17 +93,16 @@ end
 function load_observation_data(file_path::String, noise_var::Float64=0.0)
     h5open(file_path, "r") do file
         t = read(file["t_array"])
-        x = read(file["xgrid"])
-        h = read(file["h"])
         b = read(file["b_exact"])
-        H = h .+ b
-        obs_interpolated = LinearInterpolation((t, x), H')
-        sensor_pos = [2., 4., 6., 8.]
+        observation_H = read(file["H_sensor"])
+        obs_itp = [LinearInterpolation(t, H_sensor) for H_sensor in eachrow(observation_H)]
+        sensor_pos = [3.5, 5.5, 7.5]
         t_measured = collect(0:0.1:10)
-        observation_H = obs_interpolated.(t_measured, sensor_pos')
+        tstart = attrs(file)["tstart"]
+        observation_H = hcat([obs_itp_i.(t_measured) for obs_itp_i in obs_itp]...)
         noise = noise_var > 0 ? rand(Normal(0, noise_var), size(observation_H)) : zeros(size(observation_H))
         observation_H += noise
-        return observation_data(collect(t_measured), sensor_pos, observation_H),b
+        return observation_data(t_measured, sensor_pos, observation_H, tstart),b
     end
 end
 
@@ -115,7 +116,8 @@ tend = config["simulation"]["tend"]
 g = config["simulation"]["g"]
 kappa = config["simulation"]["kappa"]
 dealias = config["simulation"]["dealias"]
-sim_params = simulation_setup(xbounds, timestep, nx, tend, g, kappa, dealias)
+scenario = config["simulation"]["scenario"]
+sim_params = simulation_setup(xbounds, timestep, nx, tend, g, kappa, dealias, scenario)
 
 save = config["output"]["save"]
 target_dir = config["output"]["path"]*Dates.format(now(), "Y-mm-dd-HH-MM-SS")

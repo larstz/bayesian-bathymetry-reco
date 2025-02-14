@@ -40,7 +40,7 @@ dataObj = utils.data(measurement)
 # lbc1 = swe.leftbc(measurement)
 # lbc2 = swe.leftbc(mean_bc)
 bathy = swe.rampFunc
-# gaussian = swe.gaussian_bathymetry
+gaussian = swe.gaussian_bathymetry
 # println(norm(lbc1.f(observation.x) - lbc2.f(observation.x)))
 # cost(x) = sum((bathy(observation.x) - gaussian(observation.x, x)).^2)
 # res = optimize(cost, [4., 0.1])
@@ -55,17 +55,17 @@ xbounds = (1.5, 15.)
 nx =  100
 total_t = 10
 tstart = 32.
-timestep = 5e-5
-timestepstr = "5e-5"
+timestep = 1e-3
+timestepstr = "1e-3"
 g = 9.81
 kappa = 0.2
 dealias = 3/2
 problemtype = "waterchannel"
-
+problem_bathy = "two_gaussian"
 # Create SWE solver and calculate the solution
 solver = swe.SWESolver(xbounds, timestep, nx, total_t, tstart=tstart, g=g, kappa=kappa, dealias=dealias,  problemtype=problemtype)
 x = solver.domain.x
-b = bathy(x)
+b = gaussian(x, (5, 0.5)) + gaussian(x, (10.5, 1))
 # Use the solver to simulate the shallow water equation with the sampled peak
 @time sensor_sim, t, simulation_h, _ = solver.solve(b)
 H = simulation_h .+ b'
@@ -77,7 +77,7 @@ error = (sensor_sim .- sensor_obs)
 println(size(error))
 rel_l2_error = [norm(error[:,i])./ norm(sensor_obs[:,i]) for i in 1:size(error,2)]
 println("Relative Error: ", rel_l2_error)
-plot_path = "plots/simulation_$(problemtype)_nx=$(nx)_dt=$(timestepstr)"
+plot_path = "plots/simulation_$(problemtype)_$(problem_bathy)_nx=$(nx)_dt=$(timestepstr)"
 println("Save figure in $(plot_path)? (y/o/[n]): ")
 s = readline()
 if s == "y" || s == "o"
