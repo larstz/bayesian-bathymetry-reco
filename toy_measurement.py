@@ -1,39 +1,55 @@
 import os
+import tomllib
+
 import h5py
 import numpy as np
+
 from swe_wrapper import SWESolver, rampFunc, gaussian_bathymetry
 
 
 def main():
     """This script is used to generate the simulation data to use
     for reconstruction of bathymetry."""
-    # Get the parent directory of the current file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(current_dir, "data/toy_measurement")
-
+    # Change to the directory of this file
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    with open("config.toml" , "rb") as f:
+        config = tomllib.load(f)
+    path = config["observation"]["path"]
 
     # Ensure the directory exists
     os.makedirs(path, exist_ok=True)
 
     # Set up the parameters for measurement simulation (# for simulation in MCMC)
-    xbounds = (1.5, 15.)
-    nx =  130
-    total_t = 10
-    tstart = 32.
-    timestep = 5e-5
-    g = 9.81
-    kappa = 0.2
-    dealias = 3/2
-    problemtype = "waterchannel"
-    problem_bathy = "two_gaussian"
-    peak1 = (5, 0.5)
-    peak2 = (10.5, 1)
+    sim_params = config["simulation"]
+    xbounds = sim_params["xbounds"]
+    nx =  sim_params["nx"]
+    total_t = sim_params["tinterval"]
+    tstart = sim_params["tstart"]
+    timestep = sim_params["timestep"]
+    g = sim_params["g"]
+    kappa = sim_params["kappa"]
+    dealias = sim_params["dealias"]
+    problemtype = sim_params["scenario"]
+    problem_bathy = sim_params["bathymetry"]
+
     # Create SWE solver and calculate the solution
     solver = SWESolver(xbounds, timestep, nx, total_t,
-                       tstart=tstart, g=g, kappa=kappa, dealias=dealias,
-                       problemtype=problemtype)
+                        tstart=tstart, g=g, kappa=kappa, dealias=dealias,
+                        problemtype=problemtype)
     x = solver.domain.x
-    bathy = gaussian_bathymetry(x, peak1) + gaussian_bathymetry(x, peak2)
+
+    # Set up the bathymetry
+    bathy_config = config["bathymetry"]
+    bathy_params = bathy_config["parameters"]
+
+    if bathy_config["parametrized"]:
+        assert bathy_config["npeaks"] == len(bathy_params)//2 # Check if the number of peaks is correct
+        bathy = np.zeros_like(x)
+        for i in range(bathy_config["npeaks"]):
+            bathy = gaussian_bathymetry(x, bathy_params[2*i:2*(i+1)])
+    else:
+        bathy = rampFunc(x)
+
     print("Start Simulation")
     H_sensor, t_array, h_array, u_array = solver.solve(bathy)
     print("Simulation Done")
@@ -58,8 +74,9 @@ def main():
         f.attrs["g"] = g
         f.attrs["k"] = kappa
         f.attrs["M"] = nx
-        f.attrs["gaussian1"] = peak1
-        f.attrs["gaussian2"] = peak2
+        if bathy_config["parametrized"]:
+            f.attrs["npeaks"] = bathy_config["npeaks"]
+            f.attrs["bathy_params"] = bathy_params
 
 if __name__ == "__main__":
     main()
