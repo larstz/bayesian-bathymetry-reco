@@ -19,7 +19,7 @@ statistical fashion using Bayes theorem. Bayesian inverse problems involve using
 To use the code in this repository, follow these steps:
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/bayesian-inverse-problems.git
+    git clone https://collaborating.tuhh.de/l_stz/bayesian-inverse-problems
     ```
 2. Navigate to the project directory:
     ```bash
