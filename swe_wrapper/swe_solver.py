@@ -101,8 +101,9 @@ class PeriodicInitialConditions(InitialConditions):
     """Initial conditions for the periodic problem."""
     def __init__(self, domain: CustomDomain, xbound: tuple[float, float]=(0., 10.)):
         super().__init__(domain)
-        self.H = 0.3 + 0.5 * np.exp(-(domain.x - xbound[1] / 2) ** 2 / 2 ** 2)\
-                * 0.05 * np.sin(0.2 * np.pi * domain.x)
+        width = (xbound[1] - xbound[0])
+        self.H = 0.3 + 0.5 * np.exp(-(domain.x - (width/2+xbound[0])) ** 2 / 2 ** 2)\
+                * 0.05 * np.sin(2 * np.pi/width * (domain.x- xbound[0]))
 
 
 class WaterChannelInitialConditions(InitialConditions):
@@ -251,7 +252,7 @@ class SWESolver():
         # Initialize domain, initial conditions, and solver
         if self.problemtype == 'periodic':
             self.domain = PeriodicDomain(self.xbound, self.nx, self.params['dealias'])
-            self.ic= PeriodicInitialConditions(self.domain)
+            self.ic= PeriodicInitialConditions(self.domain, self.xbound)
             self.solver = PeriodicSolver(self.domain, self.ic, self.params)
         elif self.problemtype == 'waterchannel':
             self.domain = WaterChannelDomain(self.xbound, self.nx, self.params['dealias'])
@@ -267,9 +268,10 @@ class SWESolver():
             peak: The peak of the Gaussian bathymetry.
 
         Returns:
-            h_list: The list of water height.
-            u_list: The list of velocity.
-            t_list: The list of time.
+            H_sensor: The water height at the sensor positions.
+            t_list: The array of time.
+            h_list: The array of water height.
+            u_list: The array of velocity.
         """
 
         # Set the initial conditions
@@ -284,8 +286,8 @@ class SWESolver():
         # Set parameters for the solver
         solver = self.solver.get_problem()
         solver.stop_wall_time = 15000
-        solver.stop_iteration = int(self.total_t/abs(self.dt))+1
-        solver.stop_sim_time = self.total_t - 1e-13
+        solver.stop_iteration = int(self.total_t/abs(self.dt))
+        solver.stop_sim_time = self.total_t #- 1e-13
 
         H_sensor_list = [temph_sensor]
         h_complete_list = [np.copy(self.ic.h['g'])]
