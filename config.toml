@@ -1,16 +1,16 @@
 title = "MH Bathymetry Reco setup"
 
 [simulation]
-xbounds = [0.0, 10.0]
+xbounds = [1.5, 15.0]
 timestep = 1e-3
 nx =  100
-tstart = 0
+tstart = 32
 tinterval = 10
 g = 9.81
 kappa = 0.2
 dealias = 1.5
-scenario = "periodic"
-bathymetry = "one_gaussian_small_domain_test"
+scenario = "waterchannel"
+bathymetry = "exact_bathy"
 
 [bathymetry]
 parametrized = true
@@ -19,10 +19,10 @@ npeaks = 1
 
 [sampler]
 parametrized = true
-initial = [3.5, 0.5]
-stepsize = 0.1
+initial = [4.0, 1.0]
+stepsize = [1.0, 0.1]
 likelihood_var = 0.001
-n_samples = 1000
+n_samples = 20
 burnin = 0
 
 [observation]
