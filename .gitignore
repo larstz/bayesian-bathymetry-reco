@@ -2,5 +2,7 @@ Manifest.toml
 swe_wrapper.egg-info
 *.pyc
 experiment_data
+data
 *.h5
 *.jls
+*.png
