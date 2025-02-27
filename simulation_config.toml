@@ -4,17 +4,17 @@ title = "Toy Measurement Setup"
 xbounds = [1.5, 15.0]
 timestep = 5e-5
 nx =  130
-tstart = 32
+tstart = 32 # only used for waterchannel
 tinterval = 10
 g = 9.81
 kappa = 0.2
 dealias = 1.5
 sensor_position = [3.5, 5.5, 7.5] # must remain in between xbounds
-scenario = "waterchannel" #supported are waterchannel and periodic
+scenario = "periodic" #supported are waterchannel and periodic
 bathymetry = "gaussian" #supported are exact_bathy and gaussian
 
 [bathymetry]
-parameters = [3.5, 0.5]
+parameters = [8.0, 1.0]
 npeaks = 1
 
 [output]

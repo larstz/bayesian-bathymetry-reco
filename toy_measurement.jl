@@ -45,10 +45,10 @@ bathy_params = bathy_config["parameters"]
 bathy = zero(x)
 
 if problem_bathy == "gaussian"
-    param_tuple =  length(bathy_params)/2 == bathy_config["npeaks"] ?
+    param_tuples =  length(bathy_params)/2 == bathy_config["npeaks"] ?
     [(bathy_params[i], bathy_params[i+1]) for i in 1:2:length(bathy_params)] : println("Number of peaks and number of parameters doesn't match!")
-    for params in 1:2:length(bathy_params)
-       global bathy += swe.gaussian_bathymetry(x, (bathy_params[i], bathy_params[i+1]))
+    for params in param_tuples
+       global bathy += swe.gaussian_bathymetry(x, params)
     end
 elseif  problem_bathy == "exact_bathy"
     global bathy = swe.rampFunc(x)
@@ -63,6 +63,9 @@ dx = (xbounds[2]-xbounds[1])/nx
 
 if config["output"]["save"]
     sim_name = "$(problemtype)_$(problem_bathy)"
+    if problem_bathy == "gaussian"
+        sim_name *= "_$(bathy_config["npeaks"])_peaks"
+    end
     sim_path = joinpath(path,sim_name)
 
     mkpath(sim_path)
