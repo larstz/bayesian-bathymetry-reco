@@ -9,8 +9,9 @@ tinterval = 10
 g = 9.81
 kappa = 0.2
 dealias = 1.5
-scenario = "waterchannel"
-bathymetry = "exact_bathy"
+sensor_position = [3.5, 5.5, 7.5] # must remain in between xbounds
+scenario = "waterchannel" #supported are waterchannel and periodic
+bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
 [bathymetry]
 parametrized = true
@@ -19,10 +20,10 @@ npeaks = 1
 
 [sampler]
 parametrized = true
-initial = [4.0, 1.0]
+initial = [2.0, 1.0]
 stepsize = [1.0, 0.1]
 likelihood_var = 0.001
-n_samples = 20
+n_samples = 1500
 burnin = 0
 
 [observation]
@@ -31,4 +32,4 @@ noise_var = 0.0
 
 [output]
 save = true
-path = "./data/results/experiment_"
+path = "./data/results"

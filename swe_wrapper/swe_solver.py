@@ -101,7 +101,7 @@ class PeriodicInitialConditions(InitialConditions):
     """Initial conditions for the periodic problem."""
     def __init__(self, domain: CustomDomain, xbound: tuple[float, float]=(0., 10.)):
         super().__init__(domain)
-        width = (xbound[1] - xbound[0])
+        width = xbound[1] - xbound[0]
         self.H = 0.3 + 0.5 * np.exp(-(domain.x - (width/2+xbound[0])) ** 2 / 2 ** 2)\
                 * 0.05 * np.sin(2 * np.pi/width * (domain.x- xbound[0]))
 
@@ -333,28 +333,3 @@ class SWESolver():
             temp[i] = float(sol_int.evaluate()['g'])
 
         return temp
-
-
-def main():
-    """Main function."""
-    xbounds = (0., 10.)
-    nx =  64
-    total_t = 10
-    timestep = 1e-3
-    g = 9.81
-    kappa = 0.2
-    dealias = 3/2
-
-    solver = SWESolver(xbounds, timestep, nx, total_t, g, kappa, dealias, problemtype='waterchannel')
-    b = gaussian_bathymetry(solver.domain.x, (5., 1.))
-
-    # time the solver
-    start = time()
-    h_list, u_list, t_list = solver.solve(b)
-    end = time()
-    print(f"Time taken: {end-start}")
-    print(f"Number of time steps: {len(t_list)}")
-
-
-if __name__ == "__main__":
-    main()

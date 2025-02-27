@@ -84,7 +84,6 @@ function mhsampler(observation, n, initial_x; γ=0.1, burn_in=0)
         end
         if i > burn_in
             chain[i-burn_in, :] = [x..., logp]
-            display(plot(chain[1:i-burn_in, 1], chain[1:i-burn_in, 2]))
         end
     end
     return chain
@@ -93,23 +92,26 @@ end
 
 function load_observation_data(file_path::String, noise_var::Float64=0.0)
     h5open(file_path, "r") do file
-        t = read(file["t_array"])
+        dt = attrs(file)["dt"]
+        tinterval = attrs(file)["T_N"]
+        t = collect(0:dt:tinterval)
         b = read(file["b_exact"])
         observation_H = read(file["H_sensor"])
-        # Column major to row major ordering to conform with the solver
-        observation_H = permutedims(observation_H, reverse(1:ndims(observation_H)))
+
         #obs_itp = [LinearInterpolation(t, H_sensor) for H_sensor in eachcol(observation_H)]
         sensor_pos = [3.5, 5.5, 7.5]
         t_measured = collect(0:0.001:10)
+        tid = findall(x->x in t_measured, t)
+        observation_H = observation_H[tid, :]
         tstart = attrs(file)["tstart"]
         #observation_H = vcat([obs_itp_i.(t_measured) for obs_itp_i in obs_itp])
-        observation_H = observation_H[1:20:end, :]
         noise = noise_var > 0 ? rand(Normal(0, noise_var), size(observation_H)) : zeros(size(observation_H))
         observation_H += noise
         return observation_data(t_measured, sensor_pos, observation_H, tstart),b
     end
 end
 
+#TODO: Pass the config file as an argument in the command line
 config = TOML.parsefile("config.toml")
 
 # Define the simulation parameters
@@ -121,16 +123,23 @@ g = config["simulation"]["g"]
 kappa = config["simulation"]["kappa"]
 dealias = config["simulation"]["dealias"]
 scenario = config["simulation"]["scenario"]
+problem_bathy = config["simulation"]["bathymetry"]
 sim_params = simulation_setup(xbounds, timestep, nx, tend, g, kappa, dealias, scenario)
 
-save = config["output"]["save"]
-exp_name = config["simulation"]["scenario"]*"_"*config["simulation"]["bathymetry"]
-target_dir = config["output"]["path"]*"$(exp_name)_"*Dates.format(now(), "Y-mm-dd-HH-MM-SS")
-
+# Load the observation data
 observation_path = config["observation"]["path"]
-observation_file = "simulation_data_$(exp_name).h5"
-println("Loading observation data from $observation_path$observation_file")
-observation, exact_b = load_observation_data(observation_path*observation_file, config["observation"]["noise_var"])
+exp_name = "$(scenario)_$(problem_bathy)"
+if problem_bathy == "gaussian"
+    exp_name *= "_$(bathy_config["npeaks"])_peaks"
+end
+sim_path = joinpath(observation_path, exp_name)
+observation_file = joinpath(sim_path,"jl_simulation_data.h5")
+println("Loading observation data from $(observation_file)")
+observation, exact_b = load_observation_data(observation_file, config["observation"]["noise_var"])
+
+# Set the output directory
+save = config["output"]["save"]
+target_dir = joinpath(config["output"]["path"],"$(exp_name)_"*Dates.format(now(), "Y-mm-dd-HH-MM-SS"))
 
 # Define parameters for MH sampler
 
