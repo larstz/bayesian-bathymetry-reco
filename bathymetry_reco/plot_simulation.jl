@@ -53,6 +53,6 @@ save("sensor_positions.png", fig)
 
 # Plot the waterlevel
 fig = Figure()
-ax1 = Axis3(fig[1, 1], xlabel = "x [m]", ylabel = "t [s]", zlabel="z [m]", title = "Waterlevel")
-surface!(ax1, data.x, data.t, data.H, colormap = :viridis, interpolate=false)
+ax1 = Axis3(fig[1, 1], ylabel = "x [m]", xlabel = "t [s]", zlabel="z [m]", title = "Waterlevel")
+surface!(ax1, data.x, data.t, data.H', colormap = :viridis, interpolate=false)
 save("waterlevel.png", fig)
