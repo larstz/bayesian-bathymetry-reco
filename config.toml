@@ -22,13 +22,13 @@ npeaks = 1
 parametrized = true
 initial = [3.0, 1.0]
 stepsize = [0.1, 0.01]
-likelihood_var = 0.001
-n_samples = 1500
+likelihood_var = 0.000002
+n_samples = 500
 burnin = 0
 
 [observation]
 path = "./data/toy_measurement/"
-noise_var = 1.0
+noise_var = 0.05
 
 [output]
 save = true

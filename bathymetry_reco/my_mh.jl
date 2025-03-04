@@ -120,7 +120,6 @@ function load_observation_data(file_path::String, noise_var::Float64=0.0)
         t_measured = collect(0:0.001:10)
         tid = findall(x->x in t_measured, t)
         observation_H = observation_H[tid, :]
-        clean = copy(observation_H)
         tstart = attrs(file)["tstart"]
         #observation_H = vcat([obs_itp_i.(t_measured) for obs_itp_i in obs_itp])
         # Add noise to the observation percentage of abs max value

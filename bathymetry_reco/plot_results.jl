@@ -44,7 +44,7 @@ end
 function plot_bathy(x::Array{Float64,1}, b::Function, observation::observation_data)
     b_reco = b(x)
     if size(b_reco) == size(observation.b)
-        reco_rel_error = abs.((b_reco .- observation.b)./observation.b)
+        reco_rel_error = abs.(b_reco .- observation.b)./maximum(observation.b)
     else
         reco_rel_error = 0
     end
@@ -89,7 +89,7 @@ function sensor_plots(observation::observation_data, sim_observations::Array{Flo
     return p1, p2
 end
 
-exp_name = "waterchannel_exact_bathy_2025-02-28-13-08-45"
+exp_name = "waterchannel_exact_bathy_2025-03-04-10-08-25"
 exp_dir = "./data/results/$(exp_name)"
 
 config_reco = TOML.parsefile(joinpath(exp_dir,"config_copy.toml"))
