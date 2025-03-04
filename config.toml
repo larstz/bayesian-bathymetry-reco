@@ -28,7 +28,7 @@ burnin = 0
 
 [observation]
 path = "./data/toy_measurement/"
-noise_var = 0.05
+noise_var = 1.0
 
 [output]
 save = true

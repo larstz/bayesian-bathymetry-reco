@@ -50,8 +50,16 @@ function logjoint(x, observation::observation_data)
         return -Inf
     end
     sim_observations = forward_model(x)
-    log_likelihood = sum(loglikelihood(sim_observations - observation.H))
-    return log_prior + log_likelihood
+    try
+        log_likelihood = sum(loglikelihood(sim_observations - observation.H))
+        return log_prior + log_likelihood
+    catch err
+        if isa(err, DimensionMismatch)
+            return -Inf
+        else
+            rethrow(err)
+        end
+    end
 end
 
 function simulation(param, sim_params::simulation_setup, observation::observation_data)
@@ -61,9 +69,7 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
                             tstart=observation.tstart,
                             problemtype=sim_params.scenario);
     sample_bathy = bathymetry(solver.domain.x, param)
-    sim_observations, t, _, _ = solver.solve(sample_bathy, sensor_pos=observation.x)
-    # obs_itp = [LinearInterpolation(t, H_sensor) for H_sensor in eachcol(sim_observations)]
-    # sim_observations = hcat([obs_itp_i.(observation.t) for obs_itp_i in obs_itp]...)
+    sim_observations, _, _, _ = solver.solve(sample_bathy, sensor_pos=observation.x)
     return sim_observations
 end
 
@@ -73,11 +79,9 @@ function mhsampler(observation, n, initial_x; γ=0.1, burn_in=0)
     logp = logjoint(x, observation)
     for i in ProgressBar(1:n)
         x_new = x + γ .* rand(Normal(0,1), size(x))
-        # if x_new[2] < 0 || x_new[1] < 0 || x_new[1] > 10
-        #     logp_new = -Inf
-        # else
-            logp_new = logjoint(x_new, observation)
-        # end
+
+        logp_new = logjoint(x_new, observation)
+
         if rand() < exp(logp_new - logp)
             x = x_new
             logp = logp_new
@@ -87,6 +91,19 @@ function mhsampler(observation, n, initial_x; γ=0.1, burn_in=0)
         end
     end
     return chain
+end
+
+function add_noise!(observation::Array{Float64,2}, noise_var::Float64)
+    noise = zero(observation)
+    # Maximum absolute displacement of sensor data
+    noise_level = vec(maximum(abs.(observation .- observation[1]), dims=1))
+
+    # percentage of absolute maximum displacement
+    noise_var = noise_var * maximum(noise_level)
+    noise_dist = MvNormal(zero(noise_level), noise_var.*noise_level)
+    noise = rand(noise_dist, size(observation)[1])
+    observation[:] = observation + noise'
+    return observation
 end
 
 
@@ -103,10 +120,11 @@ function load_observation_data(file_path::String, noise_var::Float64=0.0)
         t_measured = collect(0:0.001:10)
         tid = findall(x->x in t_measured, t)
         observation_H = observation_H[tid, :]
+        clean = copy(observation_H)
         tstart = attrs(file)["tstart"]
         #observation_H = vcat([obs_itp_i.(t_measured) for obs_itp_i in obs_itp])
-        noise = noise_var > 0 ? rand(Normal(0, noise_var), size(observation_H)) : zeros(size(observation_H))
-        observation_H += noise
+        # Add noise to the observation percentage of abs max value
+        add_noise!(observation_H, noise_var)
         return observation_data(t_measured, sensor_pos, observation_H, tstart),b
     end
 end
@@ -161,7 +179,8 @@ if config["sampler"]["parametrized"]
     init_b = config["sampler"]["initial"]
     println("Using parametrized initial value: $init_b")
 else
-    init_b = exact_b[2:2:end-1]
+    #TODO implment initialization for discretized sampling of bathymetry
+    init_b = exact_b
 end
 
 chain = mhsampler(observation, n_samples, init_b; burn_in=burnin, γ=γ)
