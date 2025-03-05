@@ -3,7 +3,7 @@ Pkg.activate(".")
 using Distributed
 using TOML
 using Distributions
-addprocs(4)
+addprocs(8)
 println("Running on $(nprocs()) processes")
 @everywhere using PyCall
 @everywhere swe = pyimport("swe_wrapper")
@@ -41,6 +41,7 @@ end
                             kappa=sim_params.kappa, dealias=sim_params.dealias,
                             tstart=observation.tstart,
                             problemtype=sim_params.scenario);
+    println("Solving the forward problem with bathymetry $(param)")
     sample_bathy = bathymetry(solver.domain.x, param)
     sim_observations, _, _, _ = solver.solve(sample_bathy, sensor_pos=observation.x)
     return sim_observations
@@ -109,18 +110,17 @@ observation, exact_b = load_observation_data(observation_file, config["observati
 
 # Define the parameter space
 inputs = [
-    ([3.0,1.0], sim_params, observation),
-    ([8.0,0.2], sim_params, observation),
-    ([5.0, 1.5], sim_params, observation),
-    ([10.0, 1.0], sim_params, observation)
+    [3.0,1.0],
+    [8.0,0.2],
+    [5.0, 1.5],
+    [10.0, 1.0],
+    [3.0,1.0],
+    [8.0,0.2],
+    [5.0, 1.5],
+    [10.0, 1.0]
 ]
-
 # Run the simulation
 
-@time results = pmap(x->simulation(x[1], x[2], x[3]), inputs)
+@time results = pmap(x->simulation(x, sim_params, observation), inputs)
 
-@time for p in inputs
-    println("Running on worker $(myid())")
-    simulation(p[1], p[2], p[3])
-end
 println("Done")
