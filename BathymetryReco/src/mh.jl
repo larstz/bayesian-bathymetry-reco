@@ -38,8 +38,8 @@ function logjoint(model::mcmc_model , x)
     end
 end
 
-export sample
-function sample(model::mcmc_model, n, initial_x; γ=0.1, burn_in=0)
+export sample_chain
+function sample_chain(model::mcmc_model, n, initial_x; γ=0.1, burn_in=0)
     chain = zeros(n-burn_in, length(initial_x)+1)
     x = initial_x
     logp = logjoint(model, x)
@@ -59,6 +59,6 @@ function sample(model::mcmc_model, n, initial_x; γ=0.1, burn_in=0)
     return chain
 end
 
-function sample(model::mcmc_model, setup::mcmc_setup)
-    return sample(model, setup.n, setup.init, γ=setup.γ, burn_in=setup.burn_in)
+function sample_chain(model::mcmc_model, setup::mcmc_setup)
+    return sample_chain(model, setup.n, setup.init, γ=setup.γ, burn_in=setup.burn_in)
 end

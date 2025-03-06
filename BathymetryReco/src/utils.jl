@@ -21,9 +21,10 @@ function add_noise!(observation::Array{Float64,2}, noise_var::Float64)
     return observation
 end
 
-export load_observation_data
-function load_observation_data(file_path::String, noise_var::Float64=0.0)
-    h5open(file_path, "r") do file
+export load_observation
+function load_observation(file_path::String, noise_var::Float64=0.0)
+    file = joinpath(file_path, "jl_simulation_data.h5")
+    h5open(file, "r") do file
         dt = attrs(file)["dt"]
         tinterval = attrs(file)["T_N"]
         t = collect(0:dt:tinterval)
@@ -40,13 +41,7 @@ function load_observation_data(file_path::String, noise_var::Float64=0.0)
     end
 end
 
-export simulation_setup,
-       mcmc_setup,
-       reconstructor,
-       read_config_file,
-       read_simulation_parameters,
-       read_mcmc_parameters
-
+export simulation_setup
 struct simulation_setup
     xbounds::Array{Float64, 1}
     timestep::Float64
@@ -56,33 +51,54 @@ struct simulation_setup
     kappa::Float64
     dealias::Float64
     scenario::String
-    bathy_case::String
+    bathy_name::String
 end
 
+export mcmc_setup
 struct mcmc_setup
     n::Int
-    γ::Float64
+    γ::Union{Float64, Array{Float64, 1}}
     burn_in::Int
+    likelihood_σ::Float64
     init::Array{Float64, 1}
 end
 
+export observation_settings
+struct observation_settings
+    path::String
+    noise_var::Float64
+end
+
+export io_settings
+struct io_setup
+    save::Bool
+    output_dir::String
+end
+
+export reconstructor
 struct reconstructor
     sim_params::simulation_setup
     mcmc_params::mcmc_setup
+    obs_settings::observation_settings
+    io_settings::io_setup
 end
 
+export bathymetry_setup
 struct bathymetry_setup
     θ::Array{Float64,1}
 end
 
-function read_config_file(file_path::String)
+export load_config
+function load_config(file_path::String)
     config = TOML.parsefile(file_path)
     sim_params = read_simulation_parameters(config["simulation"])
-    mcmc_params = read_mcmc_parameters(config["mcmc"])
-    io_settings = read
-    return reconstructor(sim_params, mcmc_params)
+    mcmc_params = read_mcmc_parameters(config["sampler"])
+    obs_settings = read_observation_settings(config["observation"])
+    io_settings = read_io_settings(config["output"])
+    return reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
 end
 
+export read_simulation_parameters
 function read_simulation_parameters(config::Dict{String,Any})
     xbounds = config["xbounds"]
     timestep = config["timestep"]
@@ -97,15 +113,34 @@ function read_simulation_parameters(config::Dict{String,Any})
     return sim_params
 end
 
+export read_mcmc_parameters
 function read_mcmc_parameters(config::Dict{String,Any})
     n = config["n_samples"]
     γ = config["stepsize"]
     burn_in = config["burn_in"]
+    likelihood_σ = config["likelihood_var"]
     init = config["initial"]
-    mcmc_params = mcmc_setup(n, γ, burn_in, init)
+    mcmc_params = mcmc_setup(n, γ, burn_in, likelihood_σ,init)
     return mcmc_params
 end
 
+export read_observation_settings
+function read_observation_settings(config::Dict{String,Any})
+    path = config["path"]
+    noise_var = config["noise_var"]
+    obs_settings = observation_settings(path, noise_var)
+    return obs_settings
+end
+
+export read_io_settings
+function read_io_settings(config::Dict{String,Any})
+    save = config["save"]
+    path = config["path"]
+    io_settings = io_setup(save, path)
+    return io_settings
+end
+
+export read_bathymetry_parameters
 function read_bathymetry_parameters(config::Dict{String,Any})
     μ = config["μ"]
     σ² = config["σ²"]
@@ -113,4 +148,5 @@ function read_bathymetry_parameters(config::Dict{String,Any})
     bathy_params = bathymetry_params(μ, σ², scale)
     return bathy_params
 end
+
 
