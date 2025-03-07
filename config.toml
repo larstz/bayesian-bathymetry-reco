@@ -13,21 +13,20 @@ sensor_position = [3.5, 5.5, 7.5] # must remain in between xbounds
 scenario = "waterchannel" #supported are waterchannel and periodic
 bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
-[bathymetry]
+[bathymetry] # used to generate toy measurement
 parametrized = true
 parameters = [3.5, 0.5]
 npeaks = 1
 
 [sampler]
-parametrized = true
-initial = [3.0, 1.0]
 stepsize = [0.1, 0.01]
 likelihood_var = 0.000002
-n_samples = 500
-burnin = 0
+n_samples = 2
+burn_in = 0
+initial = [3.5, 0.5]
 
 [observation]
-path = "./data/toy_measurement/"
+path = "./data/toy_measurement/waterchannel_exact_bathy"
 noise_var = 0.05
 
 [output]
