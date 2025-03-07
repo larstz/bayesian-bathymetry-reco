@@ -59,7 +59,7 @@ struct mcmc_setup
     γ::Union{Float64, Array{Float64, 1}}
     burn_in::Int
     likelihood_σ::Float64
-    init::Array{Float64, 1}
+    initial_θ::Union{Array{Float64, 1}, Array{Array{Float64, 1}, 1}}
 end
 
 export observation_settings

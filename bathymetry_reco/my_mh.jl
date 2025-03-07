@@ -182,6 +182,7 @@ else
     init_b = exact_b
 end
 
+# chain = pmap(x->mhsampler(observation, n_samples, x; burn_in=burnin, γ=γ), inputs)
 chain = mhsampler(observation, n_samples, init_b; burn_in=burnin, γ=γ)
 
 if save

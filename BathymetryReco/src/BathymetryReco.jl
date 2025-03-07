@@ -2,7 +2,6 @@ module BathymetryReco
 
     using Distributions
     using TOML
-    using ProgressBars
     using HDF5
 
     using PyCall
