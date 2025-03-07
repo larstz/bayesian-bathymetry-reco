@@ -27,7 +27,7 @@ function logjoint(model::mcmc_model , x)
     end
     sim_observations = model.forward(x)
     try
-        log_likelihood = sum(loglikelihood(model.posterior, sim_observations - observation.H))
+        log_likelihood = sum(loglikelihood(model.posterior, sim_observations - model.observation.H))
         return log_prior + log_likelihood
     catch err
         if isa(err, DimensionMismatch)

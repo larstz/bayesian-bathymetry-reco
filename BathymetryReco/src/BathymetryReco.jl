@@ -4,13 +4,16 @@ module BathymetryReco
     using TOML
     using ProgressBars
     using HDF5
+
     using PyCall
-    swe = pyimport("swe_wrapper")
+    swe = PyNULL()
 
+    function __init__()
+        copy!(swe, pyimport("swe_wrapper"))
+    end
 
-    export swe
     include("utils.jl")
+    include("bathymetry.jl")
     include("swe.jl")
     include("mh.jl")
-
 end

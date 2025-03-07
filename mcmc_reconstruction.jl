@@ -5,6 +5,7 @@ using Distributed
 using Distributions
 using Dates
 using TOML
+using Serialization
 using BathymetryReco
 
 # Load the configuration
@@ -25,7 +26,7 @@ target_dir = joinpath(io_config.output_dir,
                       "$(exp_name)_$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))")
 
 forward_model(params) = simulation(params, sim_config, obs_data)
-forward_model([4.,0.1])
+
 likelihood_dist = Normal(0, mcmc_config.likelihood_σ)
 prior_dist = product_distribution([Uniform(sim_config.xbounds...), Uniform(0, 2)])
 
