@@ -14,7 +14,6 @@ function add_noise!(observation::Array{Float64,2}, noise_var::Float64)
     noise_level = vec(maximum(abs.(observation .- observation[1]), dims=1))
 
     # percentage of absolute maximum displacement
-    noise_var = noise_var * maximum(noise_level)
     noise_dist = MvNormal(zero(noise_level), noise_var.*noise_level)
     noise = rand(noise_dist, size(observation)[1])
     observation[:] = observation + noise'
