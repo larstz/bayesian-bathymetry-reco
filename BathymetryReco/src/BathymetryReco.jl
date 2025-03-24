@@ -3,6 +3,7 @@ module BathymetryReco
     using Distributions
     using TOML
     using HDF5
+    using ProgressBars
 
     using PyCall
     swe = PyNULL()
