@@ -3,7 +3,7 @@ module BathymetryReco
     using Distributions
     using TOML
     using HDF5
-
+    using LinearAlgebra
     using PyCall
     swe = PyNULL()
 
