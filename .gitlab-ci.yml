@@ -1,0 +1,5 @@
+image: julia:1.11
+
+test:
+  script:
+    - julia -e 'using Pkg; Pkg.activate("BathymetryReco"); Pkg.instantiate(); Pkg.test()'
