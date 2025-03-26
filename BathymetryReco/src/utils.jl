@@ -21,7 +21,7 @@ function add_noise!(observation::Array{Float64,2}, noise_var::Float64)
 end
 
 export load_observation
-function load_observation(file_path::String, noise_var::Float64=0.0)
+function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos=[3.5, 5.5, 7.5])
     file = joinpath(file_path, "jl_simulation_data.h5")
     h5open(file, "r") do file
         dt = attrs(file)["dt"]
@@ -30,7 +30,6 @@ function load_observation(file_path::String, noise_var::Float64=0.0)
         b = read(file["b_exact"])
         observation_H = read(file["H_sensor"])
 
-        sensor_pos = [3.5, 5.5, 7.5]
         t_measured = collect(0:0.001:10)
         tid = findall(x->x in t_measured, t)
         observation_H = observation_H[tid, :]
@@ -43,6 +42,7 @@ end
 export simulation_setup
 struct simulation_setup
     xbounds::Array{Float64, 1}
+    sensor_pos::Array{Float64, 1}
     timestep::Float64
     nx::Int
     tend::Float64
@@ -100,6 +100,7 @@ end
 export read_simulation_parameters
 function read_simulation_parameters(config::Dict{String,Any})
     xbounds = config["xbounds"]
+    sensor_pos = config["sensor_position"]
     timestep = config["timestep"]
     nx = config["nx"]
     tend = config["tinterval"]
@@ -108,7 +109,9 @@ function read_simulation_parameters(config::Dict{String,Any})
     dealias = config["dealias"]
     scenario = config["scenario"]
     problem_bathy = config["bathymetry"]
-    sim_params = simulation_setup(xbounds, timestep, nx, tend, g, kappa, dealias, scenario, problem_bathy)
+    sim_params = simulation_setup(xbounds, sensor_pos, timestep,
+                                  nx, tend, g, kappa, dealias,
+                                  scenario, problem_bathy)
     return sim_params
 end
 

@@ -6,3 +6,4 @@ data
 *.h5
 *.jls
 *.png
+!BathymetryReco/test/test_data/*

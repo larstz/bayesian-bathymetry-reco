@@ -6,7 +6,7 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
                             tstart=observation.tstart,
                             problemtype=sim_params.scenario);
     sample_bathy = bathymetry(solver.domain.x, param)
-    sim_observations, _, _, _ = solver.solve(sample_bathy, sensor_pos=observation.x)
+    sim_observations, _, _, _ = solver.solve(sample_bathy, sensor_pos=sim_params.sensor_pos)
     return sim_observations
 end
 

@@ -5,11 +5,11 @@ struct Posterior
 end
 
 function logprior(p::Posterior, x)
-    return logpdf(p.prior, x)
+    return logpdf.(p.prior, x)
 end
 
 function loglikelihood(p::Posterior, x)
-    return logpdf(p.likelihood, x)
+    return logpdf.(p.likelihood, x)
 end
 
 export mcmc_model
@@ -21,7 +21,7 @@ end
 
 export logjoint
 function logjoint(model::mcmc_model , x)
-    log_prior = logprior(model.posterior,x)
+    log_prior = sum(logprior(model.posterior,x))
     if log_prior == -Inf
         return -Inf
     end
