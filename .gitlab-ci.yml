@@ -2,4 +2,9 @@ image: julia:1.11
 
 test:
   script:
+    - "${SHELL}" <(curl -L micro.mamba.pm/install.sh)
+    - source ~/.bashrc
+    - mamba create -n BathymetryReco python=3.13
+    - mamba activate BathymetryReco
+    - pip install -e swe_wrapper
     - julia -e 'using Pkg; Pkg.activate("BathymetryReco"); Pkg.instantiate(); Pkg.test()'
