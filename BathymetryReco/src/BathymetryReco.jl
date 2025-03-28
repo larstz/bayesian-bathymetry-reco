@@ -3,12 +3,13 @@ module BathymetryReco
     using Distributions
     using TOML
     using HDF5
-    using ProgressBars
-
+    using LinearAlgebra
     using PyCall
+
     swe = PyNULL()
 
     function __init__()
+        pushfirst!(pyimport("sys")."path", @__DIR__)
         copy!(swe, pyimport("swe_wrapper"))
     end
 

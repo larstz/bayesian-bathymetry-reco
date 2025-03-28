@@ -1,0 +1,14 @@
+image: julia:1.11
+
+before_script:
+  - apt-get update -y && apt-get install -y procps
+  - apt-get -y install libopenmpi-dev
+  - julia -e "println(VERSION)"
+  - curl -L micro.mamba.pm/install.sh | bash
+  - source ~/.bashrc
+
+test:
+  script:
+    - micromamba create -y -f requirements.yml
+    - micromamba activate swe
+    - julia -e 'using Pkg; Pkg.activate("BathymetryReco"); Pkg.instantiate(); Pkg.test()'

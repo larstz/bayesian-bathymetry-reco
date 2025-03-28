@@ -5,11 +5,11 @@ struct Posterior
 end
 
 function logprior(p::Posterior, x)
-    return logpdf(p.prior, x)
+    return logpdf.(p.prior, x)
 end
 
 function loglikelihood(p::Posterior, x)
-    return logpdf(p.likelihood, x)
+    return logpdf.(p.likelihood, x)
 end
 
 export mcmc_model
@@ -21,7 +21,7 @@ end
 
 export logjoint
 function logjoint(model::mcmc_model , x)
-    log_prior = logprior(model.posterior,x)
+    log_prior = sum(logprior(model.posterior,x))
     if log_prior == -Inf
         return -Inf
     end
@@ -43,7 +43,7 @@ function sample_chain(model::mcmc_model, n, initial_θ; γ=0.1, burn_in=0)
     chain = zeros(n-burn_in, length(initial_θ)+1)
     θ = initial_θ
     logp = logjoint(model, θ)
-    for i in ProgressBar(1:n)
+    for i in 1:n
         θ_new = θ + γ .* rand(Normal(0,1), size(θ))
 
         logp_new = logjoint(model, θ_new)

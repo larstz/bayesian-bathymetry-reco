@@ -181,7 +181,7 @@ class WaterChannelSolver(Solver):
 
     def __init__(self, domain: WaterChannelDomain,
                  initial_conditions: WaterChannelInitialConditions,
-                 params: dict, bcfile: str='/home/lars/DATA/Code/bayesian-inverse-problems/experiment_data/Data_Sensors_orig/With_Bathymetry/mean_bc.txt'):
+                 params: dict, bcfile: str='./test_data/mean_bc.txt'):
         super().__init__(domain, initial_conditions, params)
         self.lbc = leftbc(bcfile)
 
