@@ -1,10 +1,15 @@
 image: julia:1.11
 
+before_script:
+  - apt-get update -y && apt-get install -y procps
+  - apt-get -y install libopenmpi-dev
+  - julia -e "println(VERSION)"
+  - curl -L micro.mamba.pm/install.sh | bash
+  - /root/.local/bin/micromamba shell init -s bash -r ~/micromamba
+  - source ~/.bashrc
+
 test:
   script:
-    - "${SHELL}" <(curl -L micro.mamba.pm/install.sh)
-    - source ~/.bashrc
-    - mamba create -n BathymetryReco python=3.13
-    - mamba activate BathymetryReco
-    - pip install -e swe_wrapper
+    - micromamba create -f requirements.yml
+    - micromamba activate swe
     - julia -e 'using Pkg; Pkg.activate("BathymetryReco"); Pkg.instantiate(); Pkg.test()'

@@ -5,6 +5,7 @@ module BathymetryReco
     using HDF5
     using LinearAlgebra
     using PyCall
+    pushfirst!(PyVector(pyimport("sys")["path"]), "")
     swe = PyNULL()
 
     function __init__()
