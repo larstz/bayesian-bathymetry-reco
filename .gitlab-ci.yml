@@ -5,11 +5,10 @@ before_script:
   - apt-get -y install libopenmpi-dev
   - julia -e "println(VERSION)"
   - curl -L micro.mamba.pm/install.sh | bash
-  - /root/.local/bin/micromamba shell init -s bash -r ~/micromamba
   - source ~/.bashrc
 
 test:
   script:
-    - micromamba create -f requirements.yml
+    - micromamba create -y -f requirements.yml
     - micromamba activate swe
     - julia -e 'using Pkg; Pkg.activate("BathymetryReco"); Pkg.instantiate(); Pkg.test()'
