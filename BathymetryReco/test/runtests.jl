@@ -106,7 +106,7 @@ end
 
 @testset "Test swe" begin
     sim_params = load_config("./test_data/test_config.toml").sim_params
-    obs_data, b = load_observation("../../data/toy_measurement/waterchannel_exact_bathy")
+    obs_data, b = load_observation("./test_data/")
     sim_observations = simulation([4.0, 0.1, 0.2], sim_params, obs_data)
     @test size(sim_observations) == size(obs_data.H)
     @test sim_observations ≈ obs_data.H atol=1e-2
