@@ -1,0 +1,12 @@
+name: swe
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - mpi4py
+  - dedalus
+  - pip:
+    - ./swe_wrapper
+variables:
+  - OMP_NUM_THREADS: 1
+  - NUMEXPR_MAX_THREADS: 1
