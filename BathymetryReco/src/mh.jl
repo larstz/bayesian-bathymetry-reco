@@ -43,7 +43,7 @@ function sample_chain(model::mcmc_model, n, initial_θ; γ=0.1, burn_in=0)
     chain = zeros(n-burn_in, length(initial_θ)+1)
     θ = initial_θ
     logp = logjoint(model, θ)
-    for i in 1:n
+    for i in ProgressBar(1:n)
         θ_new = θ + γ .* rand(Normal(0,1), size(θ))
 
         logp_new = logjoint(model, θ_new)

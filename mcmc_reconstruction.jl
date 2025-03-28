@@ -27,6 +27,9 @@ io_config = config.io_settings
 obs_data, exact_b = load_observation(obs_config.path,
                                                 obs_config.noise_var)
 
+# create plot of the observation signal
+ps = plot(;title="Observation signal", xlabel="t [s]", ylabel="z [m]")
+plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
 exp_name = splitpath(obs_config.path)[end]
 
 store_exp = io_config.save
@@ -61,6 +64,7 @@ if store_exp
         plot!(pc,chain[i][:,1:end-1]; label=["μ_$i" "σ²_$i"])
         plot!(plp, chain[i][:,end]; label="$i: log p(θ)")
     end
+    savefig(ps, "observation_signal.pdf")
     savefig(pc, "./plots/chain.pdf")
     savefig(plp, "./plots/logp.pdf")
 end
