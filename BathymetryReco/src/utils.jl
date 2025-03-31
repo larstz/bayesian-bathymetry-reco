@@ -50,6 +50,7 @@ struct simulation_setup
     kappa::Float64
     dealias::Float64
     scenario::String
+    bc_file::String
     bathy_name::String
 end
 
@@ -108,10 +109,11 @@ function read_simulation_parameters(config::Dict{String,Any})
     kappa = config["kappa"]
     dealias = config["dealias"]
     scenario = config["scenario"]
+    bc_file = config["bc_file"]
     problem_bathy = config["bathymetry"]
     sim_params = simulation_setup(xbounds, sensor_pos, timestep,
                                   nx, tend, g, kappa, dealias,
-                                  scenario, problem_bathy)
+                                  scenario, bc_file, problem_bathy)
     return sim_params
 end
 

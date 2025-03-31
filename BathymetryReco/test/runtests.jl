@@ -33,6 +33,7 @@ using Distributions
             @test sim_params.kappa == 0.2
             @test sim_params.dealias == 1.5
             @test sim_params.scenario == "waterchannel"
+            @test sim_params.bc_file == "./test_data/mean_bc.txt"
             @test sim_params.bathy_name == "exact_bathy"
         end
 

@@ -240,7 +240,7 @@ class SWESolver():
     """
 
     def __init__(self, xbound: tuple[float, float], dt: float, nx: int, total_t: float, tstart: float=32.,
-                 g: float=9.81, kappa: float=0.2, dealias: float=2/3, problemtype: str='periodic'):
+                 g: float=9.81, kappa: float=0.2, dealias: float=2/3, problemtype: str='periodic', bc_file: str=''):
 
         self.xbound = xbound
         self.dt = dt
@@ -257,7 +257,7 @@ class SWESolver():
         elif self.problemtype == 'waterchannel':
             self.domain = WaterChannelDomain(self.xbound, self.nx, self.params['dealias'])
             self.ic = WaterChannelInitialConditions(self.domain, tstart=tstart)
-            self.solver = WaterChannelSolver(self.domain, self.ic, self.params)
+            self.solver = WaterChannelSolver(self.domain, self.ic, self.params, bcfile=bc_file)
         else:
             raise ValueError("Invalid problem type")
 
