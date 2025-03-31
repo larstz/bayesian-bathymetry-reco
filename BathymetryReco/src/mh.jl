@@ -5,7 +5,7 @@ struct Posterior
 end
 
 function logprior(p::Posterior, x)
-    return logpdf.(p.prior, x)
+    return logpdf(p.prior, x)
 end
 
 function loglikelihood(p::Posterior, x)
