@@ -3,7 +3,7 @@ Pkg.activate(".")
 Pkg.instantiate()
 using Distributed
 
-addprocs(4)
+addprocs(8)
 
 using Dates
 using TOML
@@ -44,7 +44,12 @@ prior_dist = product_distribution([Uniform(sim_config.xbounds...), Uniform(0, 2)
 pos = Posterior(prior_dist, likelihood_dist)
 model = mcmc_model(pos, forward_model, obs_data)
 
-chain = pmap(x->sample_chain(model, mcmc_config, x), mcmc_config.initial_θ)
+init_θ = mcmc_config.initial_θ
+if isempty(mcmc_config.initial_θ)
+    init_θ = [vec(rand(prior_dist,1)) for i in 1:mcmc_config.n_chains]
+end
+
+chain = pmap(x->sample_chain(model, mcmc_config, x), init_θ)
 
 if store_exp
     mkpath(target_dir)
