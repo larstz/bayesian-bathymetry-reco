@@ -48,9 +48,23 @@ init_θ = mcmc_config.initial_θ
 if isempty(mcmc_config.initial_θ)
     init_θ = [vec(rand(prior_dist,1)) for i in 1:mcmc_config.n_chains]
 end
-
-chain = pmap(x->sample_chain(model, mcmc_config, x), init_θ)
-
+println("#############################")
+println(size(init_θ))
+println(typeof(init_θ))
+for i in 1:mcmc_config.n_chains
+    println(init_θ[i])
+end
+println("#############################")
+@everywhere using ProgressMeter
+p = MultipleProgress([Progress(mcmc_config.n; desc="chain $i ") for i in 1:mcmc_config.n_chains], Progress(mcmc_config.n*mcmc_config.n_chains; desc="global "))
+println("Start chains: \n#############################" )
+chain = pmap(1:mcmc_config.n_chains) do i
+    println(init_θ[i])
+    println(p[i])
+    sample_chain(model, mcmc_config, init_θ[i]; log=p[i], verbose=true)
+end
+println("Chains finished \n#############################" )
+println(chain)
 if store_exp
     mkpath(target_dir)
     cd(target_dir)
@@ -60,14 +74,14 @@ if store_exp
 
     mkpath("./plots")
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
-    plp = plot(;title="Chain log", xlabel="Iteration", ylabel="Value")
+    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
     # Serialize the chain
     for (i, initial_θ) in enumerate(mcmc_config.initial_θ)
         serialize("chain_$i.jls", chain[i])
 
         # Plot the chain
-        plot!(pc,chain[i][:,1:end-1]; label=["μ_$i" "σ²_$i"])
-        plot!(plp, chain[i][:,end]; label="$i: log p(θ)")
+        plot!(pc,chain[i][:,1:end-1]; label=["μ_$i" "σ²_$i"]) # sampled parameters
+        plot!(plp, chain[i][:,end]; label="$i: log p(θ)") # log p of sample
     end
     savefig(ps, "observation_signal.pdf")
     savefig(pc, "./plots/chain.pdf")

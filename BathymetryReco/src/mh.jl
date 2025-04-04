@@ -39,7 +39,7 @@ function logjoint(model::mcmc_model , x)
 end
 
 export sample_chain
-function sample_chain(model::mcmc_model, n, initial_θ; γ=0.1, burn_in=0)
+function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, log=Progress(n), γ=0.1, burn_in=0)
     chain = zeros(n-burn_in, length(initial_θ)+1)
     θ = initial_θ
     logp = logjoint(model, θ)
@@ -55,14 +55,17 @@ function sample_chain(model::mcmc_model, n, initial_θ; γ=0.1, burn_in=0)
         if i > burn_in
             chain[i-burn_in, :] = [θ..., logp]
         end
+        if verbose
+            next!(log)
+        end
     end
     return chain
 end
 
-function sample_chain(model::mcmc_model, setup::mcmc_setup)
-    return sample_chain(model, setup.n, setup.init, γ=setup.γ, burn_in=setup.burn_in)
+function sample_chain(model::mcmc_model, setup::mcmc_setup; kargs...)
+    return sample_chain(model, setup.n, setup.init;γ=setup.γ, burn_in=setup.burn_in, kargs...)
 end
 
-function sample_chain(model::mcmc_model, setup::mcmc_setup, initial_θ)
-    return sample_chain(model, setup.n, initial_θ, γ=setup.γ, burn_in=setup.burn_in)
+function sample_chain(model::mcmc_model, setup::mcmc_setup, initial_θ; kargs...)
+    return sample_chain(model, setup.n, initial_θ;γ=setup.γ, burn_in=setup.burn_in, kargs...)
 end

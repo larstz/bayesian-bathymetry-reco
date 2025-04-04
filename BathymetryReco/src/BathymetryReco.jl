@@ -5,6 +5,7 @@ module BathymetryReco
     using HDF5
     using LinearAlgebra
     using PyCall
+    using ProgressMeter
 
     swe = PyNULL()
 
