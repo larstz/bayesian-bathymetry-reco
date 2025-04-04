@@ -40,6 +40,7 @@ using Distributions
         @testset "mcmc params" begin
             mcmc_params = config.mcmc_params
             @test mcmc_params.n == 2
+            @test mcmc_params.n_chains == 10
             @test mcmc_params.γ == [0.1, 0.01]
             @test mcmc_params.burn_in == 0
             @test mcmc_params.initial_θ == [[3.5, 0.5], [2.5, 1.5]]
