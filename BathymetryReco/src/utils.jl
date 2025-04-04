@@ -5,6 +5,7 @@ struct observation_data
     x::Array{Float64}
     H::Array{Float64}
     tstart::Float64
+    noise_std::Array{Float64}
 end
 
 export add_noise!
@@ -18,6 +19,18 @@ function add_noise!(observation::Array{Float64,2}, noise_var::Float64)
     noise = rand(noise_dist, size(observation)[1])
     observation[:] = observation + noise'
     return observation
+end
+
+export get_perc_noise
+function get_perc_noise(observation::Array{Float64,2}, noise_var::Float64)
+    noise = zero(observation)
+    # Maximum absolute displacement of sensor data
+    noise_level = vec(maximum(abs.(observation .- observation[1]), dims=1))
+
+    # percentage of absolute maximum displacement
+    noise_dist = MvNormal(zero(noise_level), Diagonal((noise_var.*noise_level)).^2)
+    noise = rand(noise_dist, size(observation)[1])'
+    return noise
 end
 
 export load_observation
@@ -34,9 +47,28 @@ function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos=
         tid = findall(x->x in t_measured, t)
         observation_H = observation_H[tid, :]
         tstart = attrs(file)["tstart"]
-        add_noise!(observation_H, noise_var)
-        return observation_data(t_measured, sensor_pos, observation_H, tstart),b
+        noise = get_perc_noise(observation_H, noise_var)
+        observation_H = observation_H + noise
+        noise_std = std(noise, dims=1)
+        return observation_data(t_measured, sensor_pos, observation_H, tstart, noise_std),b
     end
+end
+
+function load_observation(file_path::String, t_start::Float64, t_interval::Float64)
+    sensor_pos = [3.5, 5.5, 7.5]
+    measurement = CSV.read(file_path, DataFrame)
+
+    # get noise information
+    baseline_id = measurement.Time.<t_start
+    base_measurement = Matrix(measurement[baseline_id,r"Sensor[2-4]"])./100 #convert cm to m
+    noise_std = std(base_measurement, dims=1)
+
+    # extract relevant measurement data
+    obs_id = t_start.<=measurement.Time.<=t_start+t_interval
+    observation = measurement[obs_id, :]
+    t = Vector(observation[:,"Time"])
+    observation_H = Matrix(observation[:,r"Sensor[2-4]"])./100 #convert cm to m
+    return observation_data(t, sensor_pos, observation_H, t_start, noise_std)
 end
 
 export simulation_setup
@@ -45,7 +77,8 @@ struct simulation_setup
     sensor_pos::Array{Float64, 1}
     timestep::Float64
     nx::Int
-    tend::Float64
+    tstart::Float64
+    tinterval::Float64
     g::Float64
     kappa::Float64
     dealias::Float64
@@ -105,6 +138,7 @@ function read_simulation_parameters(config::Dict{String,Any})
     sensor_pos = config["sensor_position"]
     timestep = config["timestep"]
     nx = config["nx"]
+    tstart = config["tstart"]
     tend = config["tinterval"]
     g = config["g"]
     kappa = config["kappa"]
@@ -113,7 +147,7 @@ function read_simulation_parameters(config::Dict{String,Any})
     bc_file = config["bc_file"]
     problem_bathy = config["bathymetry"]
     sim_params = simulation_setup(xbounds, sensor_pos, timestep,
-                                  nx, tend, g, kappa, dealias,
+                                  nx, tstart, tend, g, kappa, dealias,
                                   scenario, bc_file, problem_bathy)
     return sim_params
 end

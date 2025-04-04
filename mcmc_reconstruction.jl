@@ -24,8 +24,12 @@ obs_config = config.obs_settings
 io_config = config.io_settings
 
 # Load the data
-obs_data, exact_b = load_observation(obs_config.path,
+if real_data
+    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
+else
+    obs_data, exact_b = load_observation(obs_config.path,
                                                 obs_config.noise_var)
+end
 
 # create plot of the observation signal
 ps = plot(;title="Observation signal", xlabel="t [s]", ylabel="z [m]")

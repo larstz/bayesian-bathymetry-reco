@@ -1,8 +1,11 @@
 module BathymetryReco
 
     using Distributions
+    using Statistics
     using TOML
     using HDF5
+    using DataFrames
+    using CSV
     using LinearAlgebra
     using PyCall
     using ProgressMeter

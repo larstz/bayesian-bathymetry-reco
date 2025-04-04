@@ -5,8 +5,9 @@ using Distributions
 @testset verbose=true "Test utils" begin
     @testset "load_observation" begin
         obs_data, b = load_observation("./test_data/")
-
+        measurement_data = load_observation("./test_data/test_measurement.txt", 32.0, 10.0)
         @test size(obs_data.H) == (length(obs_data.t), length(obs_data.x))
+        @test size(measurement_data.H) == (length(measurement_data.t), length(measurement_data.x))
         @test obs_data.tstart == 32.0
     end
 
@@ -28,7 +29,8 @@ using Distributions
             @test sim_params.sensor_pos == [3.5, 5.5, 7.5]
             @test sim_params.timestep == 1e-3
             @test sim_params.nx == 100
-            @test sim_params.tend == 10
+            @test sim_params.tstart == 32
+            @test sim_params.tinterval == 10
             @test sim_params.g == 9.81
             @test sim_params.kappa == 0.2
             @test sim_params.dealias == 1.5
@@ -93,7 +95,7 @@ end
     prior = Uniform(-1, 1)
     likelihood = Normal(0, 1)
     pos = Posterior(prior, likelihood)
-    obs = observation_data([1], [1], [1], 1)
+    obs = observation_data([1], [1], [1], 1., [1.])
     model = mcmc_model(pos, x->x, obs)
 
     θ = [0.0]
@@ -109,7 +111,12 @@ end
 @testset "Test swe" begin
     sim_params = load_config("./test_data/test_config.toml").sim_params
     obs_data, b = load_observation("./test_data/")
+    real_data = load_observation("./test_data/test_measurement.txt", sim_params.tstart, sim_params.tinterval)
     sim_observations = simulation([4.0, 0.1, 0.2], sim_params, obs_data)
+    sim_real = simulation([4.0, 0.1, 0.2], sim_params, real_data)
+    println(size(real_data.H))
+    println(size(sim_real))
     @test size(sim_observations) == size(obs_data.H)
     @test sim_observations ≈ obs_data.H atol=1e-2
+    @test sim_real ≈ real_data.H.+0.3 atol=1e-1
 end
