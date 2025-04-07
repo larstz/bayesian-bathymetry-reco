@@ -24,7 +24,7 @@ obs_config = config.obs_settings
 io_config = config.io_settings
 
 # Load the data
-if real_data
+if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
 else
     obs_data, exact_b = load_observation(obs_config.path,
@@ -42,7 +42,8 @@ target_dir = joinpath(io_config.output_dir,
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
-likelihood_dist = Normal(0, mcmc_config.likelihood_σ)
+likelihood_σ = obs_data.noise_std
+likelihood_dist = Normal(0, likelihood_σ)
 prior_dist = product_distribution([Uniform(sim_config.xbounds...), Uniform(0, 2)])
 
 pos = Posterior(prior_dist, likelihood_dist)
@@ -59,13 +60,9 @@ for i in 1:mcmc_config.n_chains
     println(init_θ[i])
 end
 println("#############################")
-@everywhere using ProgressMeter
-p = MultipleProgress([Progress(mcmc_config.n; desc="chain $i ") for i in 1:mcmc_config.n_chains], Progress(mcmc_config.n*mcmc_config.n_chains; desc="global "))
 println("Start chains: \n#############################" )
 chain = pmap(1:mcmc_config.n_chains) do i
-    println(init_θ[i])
-    println(p[i])
-    sample_chain(model, mcmc_config, init_θ[i]; log=p[i], verbose=true)
+    sample_chain(model, mcmc_config, init_θ[i])
 end
 println("Chains finished \n#############################" )
 println(chain)

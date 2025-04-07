@@ -22,13 +22,14 @@ npeaks = 1
 [sampler]
 stepsize = [0.1, 0.01]
 likelihood_var = 0.001
-n_samples = 1
-n_chains = 10
+n_samples = 1000
+n_chains = 5
 burn_in = 0
 initial = [[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0]]
 
 [observation]
-path = "./data/toy_measurement/waterchannel_exact_bathy"
+path = "./data/experiment_data/Heat1.txt"
+real_data = true
 noise_var = 0.05
 
 [output]

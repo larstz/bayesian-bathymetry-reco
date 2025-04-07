@@ -34,7 +34,7 @@ function get_perc_noise(observation::Array{Float64,2}, noise_var::Float64)
 end
 
 export load_observation
-function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos=[3.5, 5.5, 7.5])
+function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos::Array{Float64}=[3.5, 5.5, 7.5])
     file = joinpath(file_path, "jl_simulation_data.h5")
     h5open(file, "r") do file
         dt = attrs(file)["dt"]
@@ -100,6 +100,7 @@ end
 export observation_settings
 struct observation_settings
     path::String
+    real_data::Bool
     noise_var::Float64
 end
 
@@ -167,8 +168,9 @@ end
 export read_observation_settings
 function read_observation_settings(config::Dict{String,Any})
     path = config["path"]
+    real_data = config["real_data"]
     noise_var = config["noise_var"]
-    obs_settings = observation_settings(path, noise_var)
+    obs_settings = observation_settings(path, real_data, noise_var)
     return obs_settings
 end
 

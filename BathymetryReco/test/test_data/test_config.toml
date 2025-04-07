@@ -29,6 +29,7 @@ initial = [[3.5, 0.5], [2.5, 1.5]]
 
 [observation]
 path = "./data/toy_measurement/waterchannel_exact_bathy"
+real_data = false
 noise_var = 0.05
 
 [output]
