@@ -1,11 +1,11 @@
 export Posterior, logprior, loglikelihood
-struct Posterior
-    prior::Distribution
-    likelihood::Distribution
+struct Posterior{T1<:Distribution, T2<:Distribution}
+    prior::Union{T1, Array{T1}}
+    likelihood::Union{T2, Array{T2}}
 end
 
 function logprior(p::Posterior, x)
-    return logpdf(p.prior, x)
+    return logpdf.(p.prior, x)
 end
 
 function loglikelihood(p::Posterior, x)

@@ -133,6 +133,14 @@ function load_config(file_path::String)
     return reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
 end
 
+function load_config(config::Dict{String,Any})
+    sim_params = read_simulation_parameters(config["simulation"])
+    mcmc_params = read_mcmc_parameters(config["sampler"])
+    obs_settings = read_observation_settings(config["observation"])
+    io_settings = read_io_settings(config["output"])
+    return reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
+end
+
 export read_simulation_parameters
 function read_simulation_parameters(config::Dict{String,Any})
     xbounds = config["xbounds"]

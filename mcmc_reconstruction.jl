@@ -16,8 +16,10 @@ using Plots
 end
 
 # Load the configuration
+println("#############################\nRead in config file" )
 config_file = abspath("config.toml")
-config = load_config(config_file)
+toml_config = TOML.parsefile(config_file)
+config = load_config(toml_config)
 sim_config = config.sim_params
 mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
@@ -27,8 +29,7 @@ io_config = config.io_settings
 if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
 else
-    obs_data, exact_b = load_observation(obs_config.path,
-                                                obs_config.noise_var)
+    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var)
 end
 
 # create plot of the observation signal
@@ -42,16 +43,20 @@ target_dir = joinpath(io_config.output_dir,
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
-likelihood_σ = obs_data.noise_std
+likelihood_σ = maximum(obs_data.noise_std) # replace later by individual σ for each sensor
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = product_distribution([Uniform(sim_config.xbounds...), Uniform(0, 2)])
+prior_dist = [Normal(4.5,1), Uniform(0, 2)]
+
+# add newly calculated information to config
+toml_config["sampler"]["likelihood_var"] = likelihood_σ
+toml_config["sampler"]["prior"] = "$prior_dist"
 
 pos = Posterior(prior_dist, likelihood_dist)
 model = mcmc_model(pos, forward_model, obs_data)
 
 init_θ = mcmc_config.initial_θ
 if isempty(mcmc_config.initial_θ)
-    init_θ = [vec(rand(prior_dist,1)) for i in 1:mcmc_config.n_chains]
+    init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
 end
 println("#############################")
 println(size(init_θ))
@@ -60,7 +65,7 @@ for i in 1:mcmc_config.n_chains
     println(init_θ[i])
 end
 println("#############################")
-println("Start chains: \n#############################" )
+println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#############################" )
 chain = pmap(1:mcmc_config.n_chains) do i
     sample_chain(model, mcmc_config, init_θ[i])
 end
@@ -71,7 +76,9 @@ if store_exp
     cd(target_dir)
 
     # store the configuration file for reproducibility
-    cp(config_file, "./config_copy.toml")
+    open("./experiment_config.toml", "w") do io
+        TOML.print(io, toml_config)
+    end
 
     mkpath("./plots")
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
