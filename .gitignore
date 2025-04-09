@@ -6,4 +6,5 @@ data
 *.h5
 *.jls
 *.png
+LocalPreferences.toml
 !BathymetryReco/test/test_data/*

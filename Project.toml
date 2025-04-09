@@ -2,6 +2,7 @@
 BathymetryReco = "5360dcf1-8d96-4a57-a164-846f2516c14e"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Cthulhu = "f68482b8-f384-11e8-15f7-abe071a5a75f"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
@@ -21,3 +22,6 @@ PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 SliceSampling = "43f4d3e8-9711-4a8c-bd1b-03ac73a255cf"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
+[extras]
+HDF5_jll = "0234f1f7-429e-5d53-9886-15a909be8d59"

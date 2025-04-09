@@ -3,7 +3,7 @@ title = "MH Bathymetry Reco setup"
 [simulation]
 xbounds = [1.5, 15.0]
 timestep = 1e-3
-nx =  100
+nx =  64
 tstart = 32
 tinterval = 10
 g = 9.81
