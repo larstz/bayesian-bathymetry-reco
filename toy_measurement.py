@@ -18,9 +18,6 @@ def main():
         config = tomllib.load(f)
     path = config["observation"]["path"]
 
-    # Ensure the directory exists
-    os.makedirs(path, exist_ok=True)
-
     # Set up the parameters for measurement simulation (# for simulation in MCMC)
     sim_params = config["simulation"]
     xbounds = sim_params["xbounds"]
@@ -65,6 +62,8 @@ def main():
     full_path = os.path.join(path, filename)
     print("Saving results to: ", full_path)
     if store:
+        # Ensure the directory exists
+        os.makedirs(path, exist_ok=True)
         with h5py.File(full_path, "w") as f:
             f.create_dataset("h", data=h_array)
             f.create_dataset("u", data=u_array)

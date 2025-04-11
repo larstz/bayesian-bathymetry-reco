@@ -33,7 +33,7 @@ else
 end
 
 # create plot of the observation signal
-ps = plot(;title="Observation signal", xlabel="t [s]", ylabel="z [m]")
+ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface displacement [m]")
 plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
 exp_name = splitpath(obs_config.path)[end]
 
@@ -41,9 +41,21 @@ store_exp = io_config.save
 target_dir = joinpath(io_config.output_dir,
                       "$(exp_name)_$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))")
 
+if store_exp
+    mkpath(target_dir)
+    plot_path = joinpath(target_dir,"plots")
+    mkpath(plot_path)
+    savefig(ps, joinpath(plot_path,"observation_signal.pdf"))
+end
+
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
-likelihood_σ = maximum(obs_data.noise_std) # replace later by individual σ for each sensor
+likelihood_σ = mcmc_config.likelihood_σ
+if likelihood_σ == 0.0
+    likelihood_σ = maximum(obs_data.noise_std) # replace later by individual σ for each
+end
+
+println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
 prior_dist = [Normal(4.5,1), Uniform(0, 2)]
 
@@ -80,7 +92,6 @@ if store_exp
         TOML.print(io, toml_config)
     end
 
-    mkpath("./plots")
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
     plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
     # Serialize the chain
@@ -91,7 +102,6 @@ if store_exp
         plot!(pc,chain[i][:,1:end-1]; label=["μ_$i" "σ²_$i"]) # sampled parameters
         plot!(plp, chain[i][:,end]; label="$i: log p(θ)") # log p of sample
     end
-    savefig(ps, "observation_signal.pdf")
     savefig(pc, "./plots/chain.pdf")
     savefig(plp, "./plots/logp.pdf")
 end
