@@ -25,12 +25,15 @@ function logjoint(model::mcmc_model , x)
     if log_prior == -Inf
         return -Inf
     end
-    sim_observations = model.forward(x)
+
     try
+        sim_observations = model.forward(x)
         log_likelihood = sum(loglikelihood(model.posterior, sim_observations - model.observation.H))
         return log_prior + log_likelihood
     catch err
-        if isa(err, DimensionMismatch)
+        if isa(err, DimensionMismatch) || isa(err, BoundsError)
+            println("Dimension mismatch or bounds error in forward model / likelihood.")
+            println("Current parameters: ", x)
             return -Inf
         else
             rethrow(err)
