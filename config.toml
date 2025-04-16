@@ -3,7 +3,7 @@ title = "MH Bathymetry Reco setup"
 [simulation]
 xbounds = [1.5, 15.0]
 timestep = 1e-3
-nx =  64
+nx =  128
 tstart = 32
 tinterval = 10
 g = 9.81
@@ -29,9 +29,9 @@ burn_in = 0
 initial = [[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5,1.0], [6.0,0.1]]
 
 [observation]
-#path = "./data/experiment_data/Heat1.txt"
-path = "./data/toy_measurement/waterchannel_exact_bathy"
-real_data = false
+path = "./data/experiment_data/Heat1.txt"
+#path = "./data/toy_measurement/waterchannel_exact_bathy"
+real_data = true
 noise_var = 0.05
 
 [output]

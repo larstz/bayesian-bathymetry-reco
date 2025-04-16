@@ -82,7 +82,6 @@ chain = pmap(1:mcmc_config.n_chains) do i
     sample_chain(model, mcmc_config, init_θ[i])
 end
 println("Chains finished \n#############################" )
-println(chain)
 if store_exp
     mkpath(target_dir)
     cd(target_dir)
