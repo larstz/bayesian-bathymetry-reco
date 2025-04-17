@@ -20,7 +20,7 @@ parameters = [3.5, 0.5]
 npeaks = 1
 
 [sampler]
-stepsize = [0.1, 0.01]
+stepsize = [0.3, 0.05]
 likelihood_var = 0.001
 prior = ""
 n_samples = 1000
