@@ -3,6 +3,7 @@ export observation_data
 struct observation_data
     t::Array{Float64}
     x::Array{Float64}
+    sim_x::Array{Float64}
     H::Array{Float64}
     tstart::Float64
     noise_std::Array{Float64}
@@ -42,6 +43,7 @@ function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos:
         t = collect(0:dt:tinterval)
         b = read(file["b_exact"])
         observation_H = read(file["H_sensor"])
+        x = read(file["xgrid"])
 
         t_measured = collect(0:0.001:10)
         tid = findall(x->x in t_measured, t)
@@ -50,7 +52,7 @@ function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos:
         noise = get_perc_noise(observation_H, noise_var)
         observation_H = observation_H + noise
         noise_std = std(noise, dims=1)
-        return observation_data(t_measured, sensor_pos, observation_H, tstart, noise_std),b
+        return observation_data(t_measured, sensor_pos, x, observation_H, tstart, noise_std),b
     end
 end
 
