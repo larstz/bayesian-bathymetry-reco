@@ -15,8 +15,11 @@ io_config = config.io_settings
 # Load the data
 if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
+    x = Vector(LinRange(sim_config.xbounds[1], sim_config.xbounds[2], sim_config.nx))
+    exact_b = exp_bathymetry(x)
 else
     obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var)
+    x = obs_data.sim_x
 end
 
 # Load the MCMC samples
@@ -63,28 +66,31 @@ println("Plot the bathymetry samples and sensor simulations per bathymetry")
 for (idx, chain) in enumerate(samples)
     # Plot the bathymetry
     bathys = zeros(size(chain)[1], length(exact_b))
-    x = obs_data.sim_x #Vector(LinRange(sim_config.xbounds[1], sim_config.xbounds[2], length(exact_b)))
     for (i, sample) in enumerate(eachrow(chain))
         bathys[i, :] = bathymetry(x, sample[1:end-1])
     end
-    bathy_mean = mean(bathys, dims=1)
+    bathy_mean = vec(mean(bathys, dims=1))
     mean_params = vec(mean(chain[:, 1:end-1], dims=1))
-    rel_l2_error = sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2))
-    pb = plot(x, exact_b; c=:black, title="Bathymetry; rel_l2_error=$(rel_l2_error)", xlabel="x [m]", ylabel="y [m]", label="True b")
+    rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
+    rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2)), digits=4)
+    pb = plot(x, exact_b; c=:black, title="Bathymetry", xlabel="x [m]", ylabel="b [m]", label="exact")
     plot!(pb, x, bathys'; label=permutedims(vcat(["Samples"], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
-    plot!(pb, x, bathy_mean'; c=:red, label="sample mean b")
-    plot!(pb, x, bathymetry(x, mean_params); c=:blue, label="mean params b")
+    plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
+    plot!(pb, x, bathymetry(x, mean_params); c=:blue, label="mean params, ε=$(rel_l2_error)")
     # to display error use bars from quantiles
     savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx).png"))
     savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx).pdf"))
 
     # Plot the sensor simulation
     sim_chain = simulation(mean_params, sim_config, obs_data)
-    rel_l2_sim_error = sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1))
-    psim = plot(obs_data.t, obs_data.H; title="Sensor simulation, rel_l2_error=$(rel_l2_sim_error...)", label=permutedims(["Sensor $i" for i in 2:4]))
-    colors = permutedims([series.plotattributes[:linecolor] for series in psim.series_list])
-    plot!(psim, obs_data.t, sim_chain; label=permutedims(["Sim Sensor $i" for i in 2:4]), linestyle=:dash, color=colors)
-    savefig(psim, joinpath(plot_path, "pngs", "sim_chain_$(idx).png"))
-    savefig(psim, joinpath(plot_path, "pdfs", "sim_chain_$(idx).pdf"))
+    rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4)
+    for i in 2:4
+        psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
+        color = psim.series_list[1].plotattributes[:linecolor]
+        plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, color=color)
+        savefig(psim, joinpath(plot_path, "pngs", "sim_chain_$(idx)_sensor_$(i).png"))
+        savefig(psim, joinpath(plot_path, "pdfs", "sim_chain_$(idx)_sensor_$(i).pdf"))
+    end
+
 end
 

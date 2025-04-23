@@ -5,3 +5,8 @@ end
 
 bathymetry(x::Array{Float64,1}, μ₁::Float64, σ²₁::Float64,μ₂::Float64, σ²₂::Float64) = bathymetry(x, μ₁, σ²₁) .+ bathymetry(x, μ₂, σ²₂)
 bathymetry(x::Array{Float64,1}, params::Array{Float64,1}) = length(params)>4 ? params : bathymetry(x, params...)
+
+export exp_bathymetry
+function exp_bathymetry(x::Array{Float64,1})
+    return swe.rampFunc(x)
+end

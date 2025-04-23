@@ -70,7 +70,7 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
     observation = measurement[obs_id, :]
     t = Vector(observation[:,"Time"])
     observation_H = Matrix(observation[:,r"Sensor[2-4]"])./100 #convert cm to m
-    return observation_data(t, sensor_pos, observation_H, t_start, noise_std)
+    return observation_data(t, sensor_pos, [0.],observation_H, t_start, noise_std)
 end
 
 export simulation_setup

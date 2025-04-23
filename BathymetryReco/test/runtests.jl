@@ -63,39 +63,46 @@ using Distributions
 end
 
 @testset "Test bathymetry" begin
-    x = vec(collect(0:0.1:10))
-    μ = 5.0
-    σ² = 1.0
+    x = vec(collect(1.5:0.25:15.5))
+    μ = 4.0
+    σ² = 0.1
     scale = 0.2
     y = bathymetry(x, μ, σ², scale)
     @test size(y) == size(x)
-    @test y[1] ≈ scale*exp(-1/(σ²+1e-16)*(x[1]-μ)^2) atol=1e-2
-    @test y[11] ≈ scale*exp(-1/(σ²+1e-16)*(x[11]-μ)^2) atol=1e-2
-    @test y[51] ≈ scale*exp(-1/(σ²+1e-16)*(x[51]-μ)^2) atol=1e-2
+    @test y[1] ≈ scale*exp(-1/(σ²+1e-16)*(x[1]-μ)^2) atol=1e-16
+    @test y[11] ≈ scale*exp(-1/(σ²+1e-16)*(x[11]-μ)^2) atol=1e-16
+    @test y[51] ≈ scale*exp(-1/(σ²+1e-16)*(x[51]-μ)^2) atol=1e-16
 
     μ₁ = 3.0
     σ²₁ = 1.0
     μ₂ = 7.0
     σ²₂ = 1.0
-    y = bathymetry(x, μ₁, σ²₁, μ₂, σ²₂)
-    @test size(y) == size(x)
-    @test y[1] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[1]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[1]-μ₂)^2) atol=1e-2
-    @test y[11] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[11]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[11]-μ₂)^2) atol=1e-2
-    @test y[51] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[51]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[51]-μ₂)^2) atol=1e-2
+    y2 = bathymetry(x, μ₁, σ²₁, μ₂, σ²₂)
+    @test size(y2) == size(x)
+    @test y2[1] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[1]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[1]-μ₂)^2) atol=1e-16
+    @test y2[11] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[11]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[11]-μ₂)^2) atol=1e-16
+    @test y2[51] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[51]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[51]-μ₂)^2) atol=1e-16
 
     params = vec(sin.(x))
-    y = bathymetry(x, params)
+    yp = bathymetry(x, params)
     @test size(y) == size(x)
-    @test y[1] == params[1]
-    @test y[11] == params[11]
-    @test y[51] == params[51]
+    @test yp[1] == params[1]
+    @test yp[11] == params[11]
+    @test yp[51] == params[51]
+
+    y_exp = exp_bathymetry(x)
+    @test size(y_exp) == size(x)
+    @test y_exp[1] ≈ y[1] atol=1e-16
+    @test y_exp[11] ≈ y[11] atol=1e-16
+    @test y_exp[51] ≈ y[51] atol=1e-16
+
 end
 
 @testset "Test mh" begin
     prior = Uniform(-1, 1)
     likelihood = Normal(0, 1)
     pos = Posterior(prior, likelihood)
-    obs = observation_data([1], [1], [1], 1., [1.])
+    obs = observation_data([1], [1], [1], [1.], 1., [1.])
     model = mcmc_model(pos, x->x, obs)
 
     θ = [0.0]
