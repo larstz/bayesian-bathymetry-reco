@@ -2,8 +2,8 @@ using CairoMakie
 using Serialization
 
 println("Read in data from disk")
-#lp_experiment = ARGS[1]
-chain_experiment = "./data/results/waterchannel_exact_bathy_2025-04-15-16-08-57" #ARGS[2]
+lp_experiment = ARGS[1]
+
 lps = deserialize("log_posterior_values.jls")
 #grid_p = deserialize("log_posterior_grid.jls")
 μs = LinRange(1.5,15.0,100) # deserialize("log_posterior_ms.jls")
@@ -20,26 +20,33 @@ ax = Axis(f[1, 1]; title="Log Posterior", xlabel="μ", ylabel="σ", xticks=1.5:1
 cont = contourf!(ax,μs, σs, lp_mat; nan_color=:white, levels=50)
 contour!(ax, μs, σs, lp_mat; nan_color=:white,levels=49, linewidth=0.25, color=:white)
 Colorbar(f[1, 2], cont)
-files = readdir(chain_experiment)
-chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
-n_chains = length(chains)
-samples = [deserialize(joinpath(chain_experiment, file)) for file in chains]
 
-println("Plot the MCMC samples")
-for (i,chain) in enumerate(samples)
-    μ = chain[:, 1]
-    σ = chain[:, 2]
-    scatter!(ax, μ[1], σ[1])
-    lines!(ax, μ, σ, label="Chain $(i)")
+if length(ARGS) > 2
+    chain_experiment = ARGS[2]
+    files = readdir(chain_experiment)
+    chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
+    n_chains = length(chains)
+    samples = [deserialize(joinpath(chain_experiment, file)) for file in chains]
+
+    println("Plot the MCMC samples")
+    for (i,chain) in enumerate(samples)
+        μ = chain[:, 1]
+        σ = chain[:, 2]
+        scatter!(ax, μ[1], σ[1])
+        lines!(ax, μ, σ, label="Chain $(i)")
+    end
+
+    println("Plotting max posterior")
+    _, idmax = findmax(lps)
+    println("Max Posterior: ", idmax)
+    max_p = p_grid[:, idmax]
+    println("Max Posterior: ", max_p)
+    scatter!(ax, max_p[1], max_p[2], color=:black, label="Max Posterior")
+    axislegend(ax)
 end
 
-println("Plotting max posterior")
-_, idmax = findmax(lps)
-println("Max Posterior: ", idmax)
-max_p = p_grid[:, idmax]
-println("Max Posterior: ", max_p)
-scatter!(ax, max_p[1], max_p[2], color=:black, label="Max Posterior")
-axislegend(ax)
+
+cd(lp_experiment)
 
 save("log_posterior.png", f)
 save("log_posterior.pdf", f)

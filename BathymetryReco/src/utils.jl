@@ -35,7 +35,7 @@ function get_perc_noise(observation::Array{Float64,2}, noise_var::Float64)
 end
 
 export load_observation
-function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos::Array{Float64}=[3.5, 5.5, 7.5])
+function load_observation(file_path::String, noise_var::Float64=0.0; sensor_pos::Array{Float64}=[3.5, 5.5, 7.5], sensor_rate::Float64=0.001)
     file = joinpath(file_path, "jl_simulation_data.h5")
     h5open(file, "r") do file
         dt = attrs(file)["dt"]
@@ -45,7 +45,7 @@ function load_observation(file_path::String, noise_var::Float64=0.0, sensor_pos:
         observation_H = read(file["H_sensor"])
         x = read(file["xgrid"])
 
-        t_measured = collect(0:0.001:10)
+        t_measured = collect(0:sensor_rate:10)
         tid = findall(x->x in t_measured, t)
         observation_H = observation_H[tid, :]
         tstart = attrs(file)["tstart"]
@@ -104,6 +104,8 @@ struct observation_settings
     path::String
     real_data::Bool
     noise_var::Float64
+    sensor_rate::Float64
+    sensor_pos::Array{Float64, 1}
 end
 
 export io_settings
@@ -180,7 +182,14 @@ function read_observation_settings(config::Dict{String,Any})
     path = config["path"]
     real_data = config["real_data"]
     noise_var = config["noise_var"]
-    obs_settings = observation_settings(path, real_data, noise_var)
+    if real_data
+        sensor_pos = [3.5, 5.5, 7.5]
+        sensor_rate = 0.01
+    else
+        sensor_pos = config["sensor_pos"]
+        sensor_rate = config["sensor_rate"]
+    end
+    obs_settings = observation_settings(path, real_data, noise_var, sensor_rate, sensor_pos)
     return obs_settings
 end
 

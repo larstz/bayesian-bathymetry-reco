@@ -4,9 +4,11 @@ using Distributions
 
 @testset verbose=true "Test utils" begin
     @testset "load_observation" begin
-        obs_data, b = load_observation("./test_data/")
+        sensor_rate = 0.1
+        obs_data, b = load_observation("./test_data/", sensor_rate=sensor_rate)
         measurement_data = load_observation("./test_data/test_measurement.txt", 32.0, 10.0)
         @test size(obs_data.H) == (length(obs_data.t), length(obs_data.x))
+        @test length(obs_data.t) == 10/sensor_rate+1.
         @test size(measurement_data.H) == (length(measurement_data.t), length(measurement_data.x))
         @test obs_data.tstart == 32.0
     end

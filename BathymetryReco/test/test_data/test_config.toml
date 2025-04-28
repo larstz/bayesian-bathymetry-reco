@@ -31,6 +31,8 @@ initial = [[3.5, 0.5], [2.5, 1.5]]
 path = "./data/toy_measurement/waterchannel_exact_bathy"
 real_data = false
 noise_var = 0.05
+sensor_rate = 0.01
+sensor_pos = [3.5, 5.5, 7.5] # must remain in between xbounds
 
 [output]
 save = true

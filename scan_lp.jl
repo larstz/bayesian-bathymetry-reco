@@ -24,7 +24,7 @@ io_config = config.io_settings
 if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var)
+    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var; sensor_rate=obs_config.sensor_rate)
 end
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
