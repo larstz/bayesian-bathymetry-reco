@@ -119,7 +119,7 @@ end
 
 @testset "Test swe" begin
     sim_params = load_config("./test_data/test_config.toml").sim_params
-    obs_data, b = load_observation("./test_data/")
+    obs_data, b = load_observation("./test_data/", sensor_rate=0.1)
     real_data = load_observation("./test_data/test_measurement.txt", sim_params.tstart, sim_params.tinterval)
     sim_observations = simulation([4.0, 0.1, 0.2], sim_params, obs_data)
     sim_real = simulation([4.0, 0.1, 0.2], sim_params, real_data)
