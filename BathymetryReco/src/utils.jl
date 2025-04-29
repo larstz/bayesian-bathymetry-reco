@@ -68,7 +68,7 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
     # extract relevant measurement data
     obs_id = t_start.<=measurement.Time.<=t_start+t_interval
     observation = measurement[obs_id, :]
-    t = Vector(observation[:,"Time"])
+    t = round.(Vector(observation[:,"Time"]).-t_start, digits=2)
     observation_H = Matrix(observation[:,r"Sensor[2-4]"])./100 #convert cm to m
     return observation_data(t, sensor_pos, [0.],observation_H, t_start, noise_std)
 end

@@ -4,10 +4,9 @@ using Serialization
 println("Read in data from disk")
 lp_experiment = ARGS[1]
 
-lps = deserialize("log_posterior_values.jls")
-#grid_p = deserialize("log_posterior_grid.jls")
-μs = LinRange(1.5,15.0,100) # deserialize("log_posterior_ms.jls")
-σs = LinRange(0.0, 2.0, 50) # deserialize("log_posterior_ss.jls")
+lps = deserialize(joinpath(lp_experiment, "log_posterior_values.jls"))
+μs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ms.jls"))
+σs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ss.jls"))
 p_grid = hcat([[μ, σ] for μ in μs for σ in σs]...)
 
 lp_mat = permutedims(reshape(lps, length(σs), length(μs)))

@@ -9,7 +9,6 @@ println("Added $(nworkers()) workers.")
 
 @everywhere begin
     using BathymetryReco
-    using SharedArrays
 end
 
 config_file = abspath("config.toml")
