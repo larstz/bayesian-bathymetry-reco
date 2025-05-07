@@ -20,7 +20,7 @@ parameters = [3.5, 0.5]
 npeaks = 1
 
 [sampler]
-stepsize = [0.3, 0.05]
+stepsize = [0.1, 0.01]
 likelihood_var = 0.001
 prior = ""
 n_samples = 1000
@@ -32,7 +32,7 @@ initial = [[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5,1.0]
 #path = "./data/experiment_data/Heat1.txt"
 path = "./data/toy_measurement/waterchannel_exact_bathy"
 real_data = false
-noise_var = 0.0
+noise_var = 1.0
 sensor_rate = 0.01
 sensor_pos = [3.5, 5.5, 7.5] # must remain in between xbounds
 
