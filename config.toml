@@ -29,10 +29,12 @@ burn_in = 0
 initial = [[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5,1.0], [6.0,0.1]]
 
 [observation]
-path = "./data/experiment_data/Heat1.txt"
-#path = "./data/toy_measurement/waterchannel_exact_bathy"
-real_data = true
-noise_var = 0.05
+#path = "./data/experiment_data/Heat1.txt"
+path = "./data/toy_measurement/waterchannel_exact_bathy"
+real_data = false
+noise_var = 1.0
+sensor_rate = 0.01
+sensor_pos = [3.5, 5.5, 7.5] # must remain in between xbounds
 
 [output]
 save = true

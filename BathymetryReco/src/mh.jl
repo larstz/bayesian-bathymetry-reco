@@ -42,24 +42,25 @@ function logjoint(model::mcmc_model , x)
 end
 
 export sample_chain
-function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, log=Progress(n), γ=0.1, burn_in=0)
-    chain = zeros(n-burn_in, length(initial_θ)+1)
+function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=Progress(n), γ=0.1, burn_in=0)
+    chain = zeros(n-burn_in+1, length(initial_θ)+1)
     θ = initial_θ
     logp = logjoint(model, θ)
+    chain[1, :] = [θ..., logp]
     for i in 1:n
         θ_new = θ + γ .* rand(Normal(0,1), size(θ))
 
         logp_new = logjoint(model, θ_new)
 
-        if rand() < exp(logp_new - logp)
+        if log(rand()) < logp_new - logp
             θ = θ_new
             logp = logp_new
         end
         if i > burn_in
-            chain[i-burn_in, :] = [θ..., logp]
+            chain[i-burn_in+1, :] = [θ..., logp]
         end
         if verbose
-            next!(log)
+            next!(logging)
         end
     end
     return chain
