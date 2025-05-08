@@ -93,14 +93,17 @@ if store_exp
 
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
     plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
+    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value")
     # Serialize the chain
     for (i, initial_θ) in enumerate(mcmc_config.initial_θ)
         serialize("chain_$i.jls", chain[i])
 
         # Plot the chain
-        plot!(pc,chain[i][:,1:end-1]; label=["μ_$i" "σ²_$i"]) # sampled parameters
-        plot!(plp, chain[i][:,end]; label="$i: log p(θ)") # log p of sample
+        plot!(pc,chain[i][:,1:end-2]; label=["μ_$i" "σ²_$i"]) # sampled parameters
+        plot!(plp, chain[i][:,end-1]; label="$i: log p(θ)") # log p of sample
+        plot!(pla, chain[i][:,end]; label="$i: α") # log p of sample
     end
     savefig(pc, "./plots/chain.pdf")
     savefig(plp, "./plots/logp.pdf")
+    savefig(pla, "./plots/acceptance_rate.pdf")
 end

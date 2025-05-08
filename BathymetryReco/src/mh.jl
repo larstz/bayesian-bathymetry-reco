@@ -43,21 +43,25 @@ end
 
 export sample_chain
 function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=Progress(n), γ=0.1, burn_in=0)
-    chain = zeros(n-burn_in+1, length(initial_θ)+1)
+    chain = zeros(n-burn_in+1, length(initial_θ)+2)
     θ = initial_θ
     logp = logjoint(model, θ)
-    chain[1, :] = [θ..., logp]
+    chain[1, :] = [θ..., logp, 1.0]
+    acceptance_rate = 1.0
+    accepted = 1
     for i in 1:n
         θ_new = θ + γ .* rand(Normal(0,1), size(θ))
 
         logp_new = logjoint(model, θ_new)
 
-        if log(rand()) < logp_new - logp
+        if (rand()) < exp(logp_new - logp)
+            accepted += 1
             θ = θ_new
             logp = logp_new
         end
+        acceptance_rate = accepted / i
         if i > burn_in
-            chain[i-burn_in+1, :] = [θ..., logp]
+            chain[i-burn_in+1, :] = [θ..., logp, acceptance_rate]
         end
         if verbose
             next!(logging)
