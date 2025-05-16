@@ -59,7 +59,7 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
             θ = θ_new
             logp = logp_new
         end
-        acceptance_rate = accepted / i
+        acceptance_rate = accepted / (i+1)
         if i > burn_in
             chain[i-burn_in+1, :] = [θ..., logp, acceptance_rate]
         end

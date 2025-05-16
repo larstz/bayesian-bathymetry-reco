@@ -15,3 +15,12 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
     return sim_observations
 end
 
+export swe_solver
+function swe_solver(sim_params::simulation_setup)
+    solver = swe.SWESolver(sim_params.xbounds, sim_params.timestep,
+                            sim_params.nx, sim_params.tinterval, g=sim_params.g,
+                            kappa=sim_params.kappa, dealias=sim_params.dealias,
+                            tstart=sim_params.tstart,
+                            problemtype=sim_params.scenario, bc_file=sim_params.bc_file);
+    return solver
+end

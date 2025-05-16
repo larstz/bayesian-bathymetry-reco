@@ -57,7 +57,7 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Normal(4.5,1), Uniform(0, 2)]
+prior_dist = [Normal(4.0,1), Normal(0.1, 0.1)]
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ

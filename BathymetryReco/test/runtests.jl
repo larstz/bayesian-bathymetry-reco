@@ -112,7 +112,7 @@ end
     @test logp ≈ logpdf(prior, θ[1]) + logpdf(likelihood, θ[1]- obs.H[1])
 
     chain = sample_chain(model, 1000, θ)
-    @test size(chain) == (1001, length(θ)+1)
+    @test size(chain) == (1001, length(θ)+2)
 
 
 end

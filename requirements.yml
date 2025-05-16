@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python=3.13
-  - mpi4py
+  - mpi4py=4.0.3=py313h7246b6a_0
   - dedalus
   - pip:
     - ./BathymetryReco/src/swe_wrapper

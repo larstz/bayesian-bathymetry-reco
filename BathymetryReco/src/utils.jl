@@ -125,6 +125,7 @@ end
 export bathymetry_setup
 struct bathymetry_setup
     θ::Array{Float64,1}
+    n_peaks::Int
 end
 
 export load_config
@@ -203,9 +204,8 @@ end
 
 export read_bathymetry_parameters
 function read_bathymetry_parameters(config::Dict{String,Any})
-    μ = config["μ"]
-    σ² = config["σ²"]
-    scale = config["scale"]
-    bathy_params = bathymetry_params(μ, σ², scale)
+    params = config["parameters"]
+    npeaks = config["npeaks"]
+    bathy_params = bathymetry_setup(params, npeaks)
     return bathy_params
 end
