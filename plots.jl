@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate(".")
+
 using BathymetryReco
 using Plots
 using DataFrames

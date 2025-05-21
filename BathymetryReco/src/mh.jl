@@ -49,9 +49,12 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
     chain[1, :] = [θ..., logp, 1.0]
     acceptance_rate = 1.0
     accepted = 1
+    #β = 0.1
     for i in 1:n
-        θ_new = θ + γ .* rand(Normal(0,1), size(θ))
 
+        #temp_proposal = γ .* rand(Normal(0,1), size(θ))
+        #θ_new = √(1-β^2) .* θ + β .* temp_proposal #γ .* rand(Normal(0,1), size(θ))
+        θ_new = θ + γ .* rand(Normal(0,1), size(θ))
         logp_new = logjoint(model, θ_new)
 
         if (rand()) < exp(logp_new - logp)
