@@ -29,7 +29,7 @@ end
 files = readdir(experiment)
 chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
 n_chains = length(chains)
-samples = [deserialize(joinpath(experiment, file)) for file in chains]
+samples = [deserialize(joinpath(experiment, file))[250:end,:] for file in chains]
 sample_mean = mean.(samples, dims=1)
 samples_mat = hcat(samples...)
 stored_vals = Int64(size(samples_mat, 2)/n_chains)
