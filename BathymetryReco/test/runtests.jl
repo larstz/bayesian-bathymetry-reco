@@ -127,5 +127,5 @@ end
     println(size(sim_real))
     @test size(sim_observations) == size(obs_data.H)
     @test sim_observations ≈ obs_data.H atol=1e-2
-    @test sim_real ≈ real_data.H.+0.3 atol=1e-1
+    @test sim_real ≈ real_data.H atol=1e-1
 end
