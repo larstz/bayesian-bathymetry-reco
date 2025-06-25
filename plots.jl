@@ -33,7 +33,7 @@ samples = [deserialize(joinpath(experiment, file)) for file in chains]
 sample_mean = mean.(samples, dims=1)
 samples_mat = hcat(samples...)
 stored_vals = Int64(size(samples_mat, 2)/n_chains)
-param_names = ["μ", "σ", "lp", "ar"]
+param_names = ["μ", "σ²", "lp", "ar"]
 
 function chains2df(chains)
     # Convert the chains to a DataFrame
@@ -58,7 +58,7 @@ println("Plot the MCMC samples")
 for i in 1:stored_vals
     param = param_names[i]
     param_per_chain = getindex.(samples, :, i)
-    pc = plot(;title="Chains for param $(param)", xlabel="Iteration", ylabel="Value")
+    pc = plot(;title="Chains for $(param)", xlabel="Iteration", ylabel="Value")
     plot!(pc, param_per_chain, label=permutedims("$(param)_".*string.(1:n_chains)))
     savefig(pc, joinpath(plot_path, "pngs", "chain_val_$(i).png"))
     savefig(pc, joinpath(plot_path, "pdfs", "chain_val_$(i).pdf"))

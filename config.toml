@@ -2,8 +2,8 @@ title = "MH Bathymetry Reco setup"
 
 [simulation]
 xbounds = [1.5, 15.0]
-timestep = 1e-3
-nx =  128
+timestep = 1e-2
+nx =  64
 tstart = 32
 tinterval = 10
 g = 9.81
@@ -15,20 +15,20 @@ bc_file = "./data/mean_bc.txt"
 bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
 [sampler]
-stepsize = [0.1, 0.01]
+stepsize = [1.0, 0.1]
 likelihood_var = 0.001
 prior = "[Normal(4.5,1), Uniform(0, 2)]"
-n_samples = 2500
+n_samples = 100
 n_chains = 7
 burn_in = 0
 initial = [[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5,1.0], [6.0,0.1]]
 
 [observation]
-#path = "./data/experiment_data/Heat1.txt"
+#path = "./experiment_data/data_sensors/With_Bathymetry/Heat1.txt"
 path = "./data/toy_measurement/waterchannel_exact_bathy"
 real_data = false
 noise_var = 0.05
-sensor_rate = 0.1
+sensor_rate = 0.01
 sensor_pos = [3.5, 5.5, 7.5] # must remain in between xbounds
 
 [output]
