@@ -45,7 +45,7 @@ if store_exp
     mkpath(target_dir)
     plot_path = joinpath(target_dir,"plots")
     mkpath(plot_path)
-    savefig(ps, joinpath(plot_path,"observation_signal.pdf"))
+    savefig(ps, joinpath(plot_path,"observation_signal.png"))
 end
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
@@ -103,7 +103,7 @@ if store_exp
         plot!(plp, chain[i][:,end-1]; label="$i: log p(θ)") # log p of sample
         plot!(pla, chain[i][:,end]; label="$i: α") # log p of sample
     end
-    savefig(pc, "./plots/chain.pdf")
-    savefig(plp, "./plots/logp.pdf")
-    savefig(pla, "./plots/acceptance_rate.pdf")
+    savefig(pc, "./plots/chain.png")
+    savefig(plp, "./plots/logp.png")
+    savefig(pla, "./plots/acceptance_rate.png")
 end
