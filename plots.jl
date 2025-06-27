@@ -6,8 +6,26 @@ using Plots
 using DataFrames
 using Statistics
 using Serialization
+using Dates
+using LaTeXStrings
+using Measures
+using Printf
+
+width_cm = 18/4
+height_cm = 9/4
+function cm2px(size)
+    dpi = 300
+    return (size[1] * dpi / 2.54, size[2] * dpi / 2.54)
+end
+
+gr()
+default(dpi=300, size=cm2px((width_cm, height_cm)), widen=false, margin=5mm)
+ticks1dec(x) = @sprintf("%.1f", x)
+#default(size=(0.25*0.75*600, 0.25*400))
+date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
 experiment = ARGS[1]
+exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
 println("Creating plots for experiment: ", experiment)
 config = load_config(joinpath(experiment, "experiment_config.toml"))
 sim_config = config.sim_params
@@ -29,11 +47,21 @@ end
 files = readdir(experiment)
 chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
 n_chains = length(chains)
-samples = [deserialize(joinpath(experiment, file))[250:end,:] for file in chains]
+samples = [deserialize(joinpath(experiment, file)) for file in chains]
+burn_in = 250
+
+# sampled 2σ² instead of σ², so we need to convert it, adjusted after 2025-06-25
+if exp_date < Date(2025,6,25)
+    setindex!.(samples, 0.5 .* getindex.(samples, :, 2), :,2)
+end
+
 sample_mean = mean.(samples, dims=1)
 samples_mat = hcat(samples...)
+
 stored_vals = Int64(size(samples_mat, 2)/n_chains)
-param_names = ["μ", "σ²", "lp", "ar"]
+param_names = ["\\mu", "\\sigma^2", "lp", "ar"]
+
+plot_size = (960,400)
 
 function chains2df(chains)
     # Convert the chains to a DataFrame
@@ -58,28 +86,37 @@ println("Plot the MCMC samples")
 for i in 1:stored_vals
     param = param_names[i]
     param_per_chain = getindex.(samples, :, i)
-    pc = plot(;title="Chains for $(param)", xlabel="Iteration", ylabel="Value")
-    plot!(pc, param_per_chain, label=permutedims("$(param)_".*string.(1:n_chains)))
+    pc = plot(;xlabel="Iteration")
+    plot!(pc, param_per_chain, label=permutedims(latexstring.("$(param)_".*string.(1:n_chains))))
+    xaxis!(pc, xminorgrid=true, xlims=(-10,2100))
+    if param == "\\sigma^2"
+        yaxis!(pc, yticks=0:0.1:1.0, yformatter=ticks1dec, yminorticks=2, ylabel=latexstring("$(param)\\ [\\mathrm{m}^2]"), yminorgrid=true)
+    end
+    if param == "\\mu"
+        yaxis!(pc, yticks=0.0:1.0:7.0, yformatter=ticks1dec, ylabel=latexstring("$(param)\\ [\\mathrm{m}]"))
+    end
     savefig(pc, joinpath(plot_path, "pngs", "chain_val_$(i).png"))
     savefig(pc, joinpath(plot_path, "pdfs", "chain_val_$(i).pdf"))
 end
 
 println("Plot the bathymetry samples and sensor simulations per bathymetry")
 # Plot Bathymetries and sensor simulations
+
 for (idx, chain) in enumerate(samples)
     # Plot the bathymetry
-    bathys = zeros(size(chain)[1], length(exact_b))
-    for (i, sample) in enumerate(eachrow(chain))
+    burnin_chain = chain[burn_in+1:end, :]
+    bathys = zeros(size(burnin_chain)[1], length(exact_b))
+    for (i, sample) in enumerate(eachrow(burnin_chain))
         bathys[i, :] = bathymetry(x, sample[1:end-2])
     end
-    bathy_mean = vec(mean(bathys, dims=1))
-    mean_params = vec(mean(chain[:, 1:end-2], dims=1))
-    rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
+    #bathy_mean = vec(mean(bathys, dims=1))
+    mean_params = vec(mean(burnin_chain[:, 1:end-2], dims=1))
+    #rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
     rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2)), digits=4)
-    pb = plot(x, exact_b; c=:black, title="Bathymetry", xlabel="x [m]", ylabel="b [m]", label="exact")
-    plot!(pb, x, bathys'; label=permutedims(vcat(["Samples"], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
-    plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
-    plot!(pb, x, bathymetry(x, mean_params); c=:blue, label="mean params, ε=$(rel_l2_error)")
+    pb = plot(x, exact_b; c=:black, xlabel="x [m]", ylabel="b [m]", label="exact")
+    plot!(pb, x, bathys'; label=permutedims(vcat([latexstring("b(x; \\mu_i, \\sigma^2_i),\\ i \\in [n]")], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
+    #plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
+    plot!(pb, x, bathymetry(x, mean_params); c=:blue, label=latexstring("b(x; \\bar{\\mu},\\bar{\\sigma}^2), \\varepsilon=$(rel_l2_error)"))
     # to display error use bars from quantiles
     savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx).png"))
     savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx).pdf"))
