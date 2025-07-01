@@ -19,7 +19,7 @@ function cm2px(size)
 end
 
 gr()
-default(dpi=300, size=cm2px((width_cm, height_cm)), widen=false, margin=5mm)
+default(dpi=300, size=cm2px((width_cm, height_cm)), widen=false, margin=5mm, labelfontsize=12, tickfontsize=12, legendfontsize=12)
 ticks1dec(x) = @sprintf("%.1f", x)
 #default(size=(0.25*0.75*600, 0.25*400))
 date_pattern = r"(\d{4}-\d{2}-\d{2})"
@@ -32,6 +32,9 @@ sim_config = config.sim_params
 mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
 io_config = config.io_settings
+
+plot_chains = false
+plot_bathys = true
 
 # Load the data
 if obs_config.real_data
@@ -82,55 +85,60 @@ plot_path = joinpath(experiment, "plots")
 mkpath.(joinpath.(plot_path, ["pdfs", "pngs"]))
 
 println("Plot the MCMC samples")
-# Plot the chains
-for i in 1:stored_vals
-    param = param_names[i]
-    param_per_chain = getindex.(samples, :, i)
-    pc = plot(;xlabel="Iteration")
-    plot!(pc, param_per_chain, label=permutedims(latexstring.("$(param)_".*string.(1:n_chains))))
-    xaxis!(pc, xminorgrid=true, xlims=(-10,2100))
-    if param == "\\sigma^2"
-        yaxis!(pc, yticks=0:0.1:1.0, yformatter=ticks1dec, yminorticks=2, ylabel=latexstring("$(param)\\ [\\mathrm{m}^2]"), yminorgrid=true)
-    end
-    if param == "\\mu"
-        yaxis!(pc, yticks=0.0:1.0:7.0, yformatter=ticks1dec, ylabel=latexstring("$(param)\\ [\\mathrm{m}]"))
-    end
-    savefig(pc, joinpath(plot_path, "pngs", "chain_val_$(i).png"))
-    savefig(pc, joinpath(plot_path, "pdfs", "chain_val_$(i).pdf"))
-end
 
+if plot_chains
+    # Plot the chains
+    for i in 1:stored_vals
+        param = param_names[i]
+        param_per_chain = getindex.(samples, :, i)
+        pc = plot(;xlabel="Iteration", legend=:outerright)
+        plot!(pc, param_per_chain, label=permutedims(latexstring.("$(param)_".*string.(1:n_chains))))
+        xaxis!(pc, xminorgrid=true, xlims=(-10,2100))
+        if param == "\\sigma^2"
+            yaxis!(pc, yticks=0:0.1:1.0, yformatter=ticks1dec, yminorticks=2, ylabel=latexstring("$(param)\\ [\\mathrm{m}^2]"), yminorgrid=true)
+        end
+        if param == "\\mu"
+            yaxis!(pc, yticks=0.0:1.0:7.0, ylim=(0.9,7.1),yformatter=ticks1dec, ylabel=latexstring("$(param)\\ [\\mathrm{m}]"))
+        end
+        savefig(pc, joinpath(plot_path, "pngs", "chain_val_$(i).png"))
+        savefig(pc, joinpath(plot_path, "pdfs", "chain_val_$(i).pdf"))
+    end
+end
 println("Plot the bathymetry samples and sensor simulations per bathymetry")
 # Plot Bathymetries and sensor simulations
+if plot_bathys
+    for (idx, chain) in enumerate(samples)
+        # Plot the bathymetry
+        burnin_chain = chain[burn_in+1:end, :]
+        bathys = zeros(size(burnin_chain)[1], length(exact_b))
+        for (i, sample) in enumerate(eachrow(burnin_chain))
+            bathys[i, :] = bathymetry(x, sample[1:end-2])
+        end
+        #bathy_mean = vec(mean(bathys, dims=1))
+        mean_params = vec(mean(burnin_chain[:, 1:end-2], dims=1))
+        #rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
+        rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2))*100, digits=2)
+        #nrmse = sqrt(mean(bathymetry(x, mean_params) .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b))
+        pb = plot(x, exact_b; c=:black, xlabel="x [m]", ylabel="b(x) [m]", label="Exact bathymetry", xlim=(1.5,12))
+        plot!(pb, x, bathys'; label=permutedims(vcat([latexstring("b(x; \\mu_i, \\sigma^2_i),\\ i \\in [n]")], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
+        #plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
+        plot!(pb, x, bathymetry(x, mean_params); c=:blue, label=latexstring("b(x; \\bar{\\mu},\\bar{\\sigma}^2),\\ \\varepsilon_\\mathrm{L2}=$(rel_l2_error)\\%"))
+        yaxis!(pb, yticks=0.0:0.05:0.5)
+        xaxis!(pb, xticks=2:2:12)
+        # to display error use bars from quantiles
+        savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx).png"))
+        savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx).pdf"))
 
-for (idx, chain) in enumerate(samples)
-    # Plot the bathymetry
-    burnin_chain = chain[burn_in+1:end, :]
-    bathys = zeros(size(burnin_chain)[1], length(exact_b))
-    for (i, sample) in enumerate(eachrow(burnin_chain))
-        bathys[i, :] = bathymetry(x, sample[1:end-2])
+        # Plot the sensor simulation
+        sim_chain = simulation(mean_params, sim_config, obs_data)
+
+        rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4)
+        for i in 2:4
+            psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
+            plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
+            savefig(psim, joinpath(plot_path, "pngs", "sim_chain_$(idx)_sensor_$(i).png"))
+            savefig(psim, joinpath(plot_path, "pdfs", "sim_chain_$(idx)_sensor_$(i).pdf"))
+        end
+
     end
-    #bathy_mean = vec(mean(bathys, dims=1))
-    mean_params = vec(mean(burnin_chain[:, 1:end-2], dims=1))
-    #rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
-    rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2)), digits=4)
-    pb = plot(x, exact_b; c=:black, xlabel="x [m]", ylabel="b [m]", label="exact")
-    plot!(pb, x, bathys'; label=permutedims(vcat([latexstring("b(x; \\mu_i, \\sigma^2_i),\\ i \\in [n]")], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
-    #plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
-    plot!(pb, x, bathymetry(x, mean_params); c=:blue, label=latexstring("b(x; \\bar{\\mu},\\bar{\\sigma}^2), \\varepsilon=$(rel_l2_error)"))
-    # to display error use bars from quantiles
-    savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx).png"))
-    savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx).pdf"))
-
-    # Plot the sensor simulation
-    sim_chain = simulation(mean_params, sim_config, obs_data)
-
-    rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4)
-    for i in 2:4
-        psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
-        plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
-        savefig(psim, joinpath(plot_path, "pngs", "sim_chain_$(idx)_sensor_$(i).png"))
-        savefig(psim, joinpath(plot_path, "pdfs", "sim_chain_$(idx)_sensor_$(i).pdf"))
-    end
-
 end
-

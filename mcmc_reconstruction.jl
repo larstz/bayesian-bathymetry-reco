@@ -46,6 +46,7 @@ if store_exp
     plot_path = joinpath(target_dir,"plots")
     mkpath(plot_path)
     savefig(ps, joinpath(plot_path,"observation_signal.png"))
+    savefig(ps, joinpath(plot_path,"observation_signal.pdf"))
 end
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
@@ -106,4 +107,7 @@ if store_exp
     savefig(pc, "./plots/chain.png")
     savefig(plp, "./plots/logp.png")
     savefig(pla, "./plots/acceptance_rate.png")
+    savefig(pc, "./plots/chain.pdf")
+    savefig(plp, "./plots/logp.pdf")
+    savefig(pla, "./plots/acceptance_rate.pdf")
 end

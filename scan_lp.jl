@@ -4,7 +4,7 @@ using Serialization
 using Distributions
 using Dates
 
-addprocs()
+addprocs(16)
 println("Added $(nworkers()) workers.")
 
 @everywhere begin
@@ -28,10 +28,10 @@ end
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
-prior_params = [4.5, 0.1, 0.0, 2.0]
+prior_params = [4.0, 1.0, 0.1, 0.1]
 likelihood_σ = mcmc_config.likelihood_σ
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Normal(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
+prior_dist = [Normal(prior_params[1:2]...), Normal(prior_params[3:4]...)]
 
 dist_str = [split("$d", "{")[1] for d in prior_dist]
 params_str = [join(prior_params[1+i*2:2+i*2],"_") for i in 0:1]
