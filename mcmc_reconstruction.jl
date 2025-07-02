@@ -33,7 +33,7 @@ else
 end
 
 # create plot of the observation signal
-ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water height [m]")
+ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface height [m]")
 plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
 exp_name = splitpath(obs_config.path)[end]
 
