@@ -15,7 +15,7 @@ lp_mat[lp_mat .== -Inf] .= NaN
 
 println("Plotting log-posterior")
 f = Figure()
-ax = Axis(f[1, 1]; title="Log Posterior", xlabel="μ", ylabel="σ", xticks=1.5:1.:15.0, yticks=0.0:0.1:2.0)
+ax = Axis(f[1, 1]; title="Log Posterior", xlabel="μ", ylabel="σ²", xticks=1.5:1.:15.0, yticks=0.0:0.1:2.0)
 cont = contourf!(ax,μs, σs, lp_mat; nan_color=:white, levels=50)
 contour!(ax, μs, σs, lp_mat; nan_color=:white,levels=49, linewidth=0.25, color=:white)
 Colorbar(f[1, 2], cont)
