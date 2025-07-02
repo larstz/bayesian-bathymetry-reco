@@ -15,13 +15,14 @@ bc_file = "./data/mean_bc.txt"
 bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
 [sampler]
-stepsize = [0.08, 0.01]
+stepsize = [0.001]
 likelihood_var = 0.001
 n_samples = 2000
 burn_in = 0
 prior = "Normal{Float64}[Normal{Float64}(μ=4.0, σ=1.0), Normal{Float64}(μ=0.1, σ=0.1)]"
-initial = [[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5, 1.0], [6.0, 0.1]]
-n_chains = 7
+#[[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5, 1.0], [6.0, 0.1]]
+initial = [ ]
+n_chains = 1
 
 [observation]
 path = "./data/experiment_data/data_sensors/With_Bathymetry/Heat1.txt"
