@@ -4,6 +4,7 @@ Pkg.instantiate()
 using HDF5
 using Plots
 using TOML
+using LaTeXStrings
 
 sim_name = "data/toy_measurement/waterchannel_exact_bathy"
 cd(sim_name)
