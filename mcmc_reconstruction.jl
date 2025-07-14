@@ -33,7 +33,7 @@ else
 end
 
 # create plot of the observation signal
-ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="H [m]")
+ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface height [m]")
 plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
 exp_name = splitpath(obs_config.path)[end]
 
@@ -46,7 +46,6 @@ if store_exp
     plot_path = joinpath(target_dir,"plots")
     mkpath(plot_path)
     savefig(ps, joinpath(plot_path,"observation_signal.png"))
-    savefig(ps, joinpath(plot_path,"observation_signal.pdf"))
 end
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
@@ -58,18 +57,26 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Normal(4.0,1), Normal(0.1, 0.1)]
+prior_dist = [Uniform(0,0.25) for _ in 1:sim_config.nx]
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 toml_config["sampler"]["prior"] = "$prior_dist"
 
+
 pos = Posterior(prior_dist, likelihood_dist)
 model = mcmc_model(pos, forward_model, obs_data)
 
 init_θ = mcmc_config.initial_θ
-if isempty(mcmc_config.initial_θ)
-    init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
+
+if isempty(init_θ)
+    #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
+    solver = swe_solver(sim_config)
+    #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
+    init_θ = [bathymetry(solver.domain.x, [4.0,0.5]) for i in 1:mcmc_config.n_chains]
+    toml_config["sampler"]["init"] = init_θ
+    inip = plot(solver.domain.x, init_θ[1])
+    savefig(inip, joinpath(plot_path, "initial_parameters.png"))
 end
 println("#############################")
 println(size(init_θ))
@@ -83,6 +90,8 @@ chain = pmap(1:mcmc_config.n_chains) do i
     sample_chain(model, mcmc_config, init_θ[i])
 end
 println("Chains finished \n#############################" )
+println(size(chain))
+println
 if store_exp
     mkpath(target_dir)
     cd(target_dir)
@@ -96,7 +105,7 @@ if store_exp
     plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
     pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value")
     # Serialize the chain
-    for (i, initial_θ) in enumerate(mcmc_config.initial_θ)
+    for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chain[i])
 
         # Plot the chain
@@ -107,7 +116,4 @@ if store_exp
     savefig(pc, "./plots/chain.png")
     savefig(plp, "./plots/logp.png")
     savefig(pla, "./plots/acceptance_rate.png")
-    savefig(pc, "./plots/chain.pdf")
-    savefig(plp, "./plots/logp.pdf")
-    savefig(pla, "./plots/acceptance_rate.pdf")
 end

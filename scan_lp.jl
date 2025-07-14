@@ -1,10 +1,14 @@
+using Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+
 using Distributed
 using TOML
 using Serialization
 using Distributions
 using Dates
 
-addprocs(16)
+addprocs(32)
 println("Added $(nworkers()) workers.")
 
 @everywhere begin
