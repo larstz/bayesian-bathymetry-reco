@@ -108,9 +108,9 @@ if store_exp
         TOML.print(io, toml_config)
     end
 
-    pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
-    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
-    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value")
+    pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright))
+    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright))
     # Serialize the chain
     for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chain[i])

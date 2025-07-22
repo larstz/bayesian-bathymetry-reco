@@ -15,8 +15,8 @@ bathymetry = "gaussian" #supported are exact_bathy and gaussian
 bc_file = "./data/mean_bc.txt"
 
 [bathymetry]
-parameters = [7.5, 0.05]
-npeaks = 1
+parameters = [4.0, 0.05, 7.0, 0.05]
+npeaks = 2
 
 [output]
 save = true
