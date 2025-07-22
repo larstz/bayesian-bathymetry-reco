@@ -21,12 +21,12 @@ n_samples = 2
 burn_in = 0
 prior = "Normal{Float64}[Normal{Float64}(μ=4.0, σ=1.0), Normal{Float64}(μ=0.1, σ=0.1)]"
 #[[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5, 1.0], [6.0, 0.1]]
-initial = [ ]
-n_chains = 1
+initial = [[6.0, 0.25], [5.0, 0.25], [4.0, 0.25], [3.0, 0.25], [7.0, 0.25], [5.5, 0.25], [6.0, 0.05]]
+n_chains = 7
 
 [observation]
 #path = "./data/experiment_data/data_sensors/With_Bathymetry/Heat1.txt"
-path = "./data/toy_measurement/waterchannel_exact_bathy"
+path = "./data/toy_measurement/waterchannel_1_peaks/[4.0, 0.05]"
 real_data = false
 noise_var = 0.05
 sensor_rate = 0.01

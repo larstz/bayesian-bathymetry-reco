@@ -20,7 +20,6 @@ ProfileView = "c46f51b8-102a-5cf2-8d2c-8597cb0e0da7"
 ProgressBars = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
-RDatasets = "ce6b1742-4840-55fa-b093-852dadbb1d8b"
 SliceSampling = "43f4d3e8-9711-4a8c-bd1b-03ac73a255cf"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
