@@ -8,48 +8,54 @@ using Serialization
 using Dates
 using LaTeXStrings
 using MCMCChains
-using MC
+using Plots
 
 
 date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
 experiment = ARGS[1]
-exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
-println("Creating plots for experiment: ", experiment)
-config = load_config(joinpath(experiment, "experiment_config.toml"))
-sim_config = config.sim_params
-mcmc_config = config.mcmc_params
-obs_config = config.obs_settings
-io_config = config.io_settings
-
-# Load the data
-if obs_config.real_data
-    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
-    x = Vector(LinRange(sim_config.xbounds[1], sim_config.xbounds[2], sim_config.nx))
-    exact_b = exp_bathymetry(x)
-else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
-    x = obs_data.sim_x
+chain_list = String[]
+for (exp,_, files) in walkdir(experiment)
+    append!(chain_list,joinpath.(exp,filter(x -> occursin(r"chain_[0-9]+.jls", x), files)))
 end
 
 # Load the MCMC samples
-files = readdir(experiment)
-chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
-n_chains = length(chains)
-samples = [deserialize(joinpath(experiment, file)) for file in chains]
-burn_in = 250
+chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), chain_list)
+targets = [match(r"\[.+\]", x).match for x in chains]
+targets_vec = unique(Meta.parse.(targets) .|> eval)
 
-# sampled 2σ² instead of σ², so we need to convert it, adjusted after 2025-06-25
-if exp_date < Date(2025,6,25)
-    setindex!.(samples, 0.5 .* getindex.(samples, :, 2), :,2)
+mu_targets = [x[1] for x in targets_vec]
+s2_targets = [x[2] for x in targets_vec]
+
+n_targets = length(targets_vec)
+n_chains = Int64(length(chains)/n_targets)
+
+samples = deserialize.(chains)
+chain_tensor = reshape(hcat(samples...), size(samples[1])[1], size(samples[1])[2], n_chains, n_targets)
+burn_in = 300
+burned_tensor = chain_tensor[burn_in:end, :, :, :]
+param_names = ["mu", "s2", "lp", "ar"]
+mean_lp = mean(burned_tensor[:, 3, :, :], dims=1)
+d_lp = maximum(mean_lp, dims=2) .- mean_lp
+
+exp_id = [reshape(d_lp[:,:,i].<10, 7) for i in 1:n_targets]
+
+mu_means = zeros(n_targets)
+s2_means = zeros(n_targets)
+mu_error = zeros(n_targets)
+s2_error = zeros(n_targets)
+for (i, id) in enumerate(exp_id)
+    mu_means[i] = mean(chain_tensor[:, 1, id, i])
+    s2_means[i] = mean(chain_tensor[:, 2, id, i])
+    temp_chain = Chains(chain_tensor[:, :, id, i], param_names, Dict(:internal => [:lp, :ar]))
+    error = mcse(temp_chain)
+    mu_error[i] = error[:mu,:mcse]
+    s2_error[i] = error[:s2,:mcse]
 end
 
-sample_mean = mean.(samples, dims=1)
-samples_mat = hcat(samples...)
-chain_tensor = cat(samples_mat..., dims=3)
-
-stored_vals = Int64(size(samples_mat, 2)/n_chains)
-param_names = ["mu", "s2", "lp", "ar"]
-
-mcmc_chain = Chains(chain_tensor, param_names, Dict(:internal => [:lp, :ar]))
-df_chains = DataFrame(mcmc_chains)
+pm = scatter(mu_targets, mu_means, yerror=mu_error, label="Mean of mu", xlabel="mu target", title="Mean of mu across plausible chains")
+plot!(pm, mu_targets, mu_targets, label="Target=mu", linestyle=:dash, color=:red)
+ps = scatter(mu_targets, s2_means, yerror=s2_error, label="Mean of s2", xlabel="mu target", title="Mean of s2 across plausible chains")
+hline!(ps, [0.05], label="Target=0.05", linestyle=:dash, color=:red)
+savefig(pm, joinpath(experiment, "mu_means.png"))
+savefig(ps, joinpath(experiment, "s2_means.png"))
