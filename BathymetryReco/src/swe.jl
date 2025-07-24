@@ -6,7 +6,7 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
                             tstart=observation.tstart,
                             problemtype=sim_params.scenario, bc_file=sim_params.bc_file);
     sample_bathy = bathymetry(solver.domain.x, param)
-    sim_observations, t_sim, _, _ = solver.solve(sample_bathy, sensor_pos=sim_params.sensor_pos)
+    sim_observations, t_sim, _, _ = solver.solve(sample_bathy, sensor_pos=observation.x)
     t_sim = vec(collect(0.0:sim_params.timestep:sim_params.tinterval))
     if length(t_sim) != length(observation.t)
         indices = findall(x-> x ∈ observation.t, t_sim)

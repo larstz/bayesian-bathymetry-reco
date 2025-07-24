@@ -12,6 +12,10 @@ function loglikelihood(p::Posterior, x)
     return logpdf.(p.likelihood, x)
 end
 
+function loglikelihood(p::Posterior, x, obs)
+    return -length(x)*0.5 * log(2π) -length(x)*log(p.likelihood.σ) - 1/ (2 * p.likelihood.σ^2)* sum((x - obs).^2 )
+end
+
 export mcmc_model
 struct mcmc_model
     posterior::Posterior
@@ -28,7 +32,7 @@ function logjoint(model::mcmc_model , x)
 
     try
         sim_observations = model.forward(x)
-        log_likelihood = sum(loglikelihood(model.posterior, sim_observations - model.observation.H))
+        log_likelihood = sum(loglikelihood(model.posterior, sim_observations, model.observation.H))
         return log_prior + log_likelihood
     catch err
         if isa(err, DimensionMismatch) || isa(err, BoundsError)
