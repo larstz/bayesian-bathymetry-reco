@@ -35,7 +35,9 @@ function get_perc_noise(observation::Array{Float64,2}, noise_var::Float64)
 end
 
 export load_observation
-function load_observation(file_path::String, noise_var::Float64=0.0; sensor_pos::Array{Float64}=[3.5, 5.5, 7.5], sensor_rate::Float64=0.001)
+function load_observation(file_path::String, noise_var::Float64=0.0; sensor_id::Array{Int64}=[2, 3, 4], sensor_rate::Float64=0.001)
+    id2pos = [3.5, 5.5, 7.5]
+    sensor_id = sensor_id .- 1 # convert to 1-based indexing
     file = joinpath(file_path, "jl_simulation_data.h5")
     h5open(file, "r") do file
         dt = attrs(file)["dt"]
@@ -47,19 +49,20 @@ function load_observation(file_path::String, noise_var::Float64=0.0; sensor_pos:
 
         t_measured = collect(0:sensor_rate:10)
         tid = findall(x->x in t_measured, t)
-        observation_H = observation_H[tid, :]
+        observation_H = observation_H[tid, sensor_id]
         tstart = attrs(file)["tstart"]
         noise = get_perc_noise(observation_H, noise_var)
         observation_H = observation_H + noise
         noise_std = std(noise, dims=1)
+        sensor_pos = id2pos[sensor_id]
         return observation_data(t_measured, sensor_pos, x, observation_H, tstart, noise_std),b
     end
 end
 
-function load_observation(file_path::String, t_start::Float64, t_interval::Float64)
-    sensor_pos = [3.5, 5.5, 7.5]
+function load_observation(file_path::String, t_start::Float64, t_interval::Float64, sensor_id::Array{Int64}=[2, 3, 4])
     measurement = CSV.read(file_path, DataFrame)
-
+    id2pos = [3.5, 5.5, 7.5]
+    sensor_id = sensor_id .- 1 # convert to 1-based indexing
     # get noise information
     baseline_id = measurement.Time.<t_start
     base_measurement = Matrix(measurement[baseline_id,r"Sensor[2-4]"])./100 #convert cm to m
@@ -67,7 +70,8 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
 
     # extract relevant measurement data
     obs_id = t_start.<=measurement.Time.<=t_start+t_interval
-    observation = measurement[obs_id, :]
+    observation = measurement[obs_id, sensor_id]
+    sensor_pos = id2pos[sensor_id]
     t = round.(Vector(observation[:,"Time"]).-t_start, digits=2)
     observation_H = Matrix(observation[:,r"Sensor[2-4]"])./100 .+0.3 # add 30 cm to all measurements, convert cm to m
     return observation_data(t, sensor_pos, [0.],observation_H, t_start, noise_std)
@@ -105,7 +109,7 @@ struct observation_settings
     real_data::Bool
     noise_var::Float64
     sensor_rate::Float64
-    sensor_pos::Array{Float64, 1}
+    sensor_id::Array{Int64, 1}
 end
 
 export io_settings
@@ -184,13 +188,13 @@ function read_observation_settings(config::Dict{String,Any})
     real_data = config["real_data"]
     noise_var = config["noise_var"]
     if real_data
-        sensor_pos = [3.5, 5.5, 7.5]
+        sensor_id = [2, 3, 4]
         sensor_rate = 0.01
     else
-        sensor_pos = config["sensor_pos"]
+        sensor_id = config["sensor_id"]
         sensor_rate = config["sensor_rate"]
     end
-    obs_settings = observation_settings(path, real_data, noise_var, sensor_rate, sensor_pos)
+    obs_settings = observation_settings(path, real_data, noise_var, sensor_rate, sensor_id)
     return obs_settings
 end
 

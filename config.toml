@@ -9,7 +9,7 @@ tinterval = 10
 g = 9.81
 kappa = 0.2
 dealias = 1.5
-sensor_position = [3.5, 5.5, 7.5] # must remain in between xbounds
+sensor_position = [3.5] # must remain in between xbounds
 scenario = "waterchannel" #supported are waterchannel and periodic
 bc_file = "./data/mean_bc.txt"
 bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
@@ -30,7 +30,7 @@ path = "./data/toy_measurement/waterchannel_exact_bathy"
 real_data = false
 noise_var = 0.05
 sensor_rate = 0.01
-sensor_pos = [3.5, 5.5, 7.5] # must remain in between xbounds
+sensor_id = [2,3,4] # Sensor IDs to use, must be in [2, 3, 4]
 
 [output]
 save = true
