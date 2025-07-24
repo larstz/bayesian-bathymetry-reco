@@ -1,6 +1,6 @@
 using Pkg
 Pkg.activate(".")
-Pkg.instantiate()
+#Pkg.instantiate()
 using Distributed
 
 addprocs(8)
@@ -15,9 +15,16 @@ using Plots
     using BathymetryReco
 end
 
+ENV["GKSwstype"]="nul"
+
 # Load the configuration
 println("#############################\nRead in config file" )
-config_file = abspath("config.toml")
+if isempty(ARGS)
+    config_file = abspath("config.toml")
+else
+    config_file = abspath(ARGS[1])
+end
+
 toml_config = TOML.parsefile(config_file)
 config = load_config(toml_config)
 sim_config = config.sim_params
@@ -57,7 +64,7 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Uniform(0,0.25) for _ in 1:sim_config.nx]
+prior_dist = [Uniform(1.5,12), Uniform(0.0,0.5)]
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
@@ -101,9 +108,9 @@ if store_exp
         TOML.print(io, toml_config)
     end
 
-    pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
-    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
-    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value")
+    pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright))
+    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright))
     # Serialize the chain
     for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chain[i])

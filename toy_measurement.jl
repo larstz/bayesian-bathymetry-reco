@@ -62,9 +62,11 @@ if io_config.save
         sim_name *= "_$(npeaks)_peaks"
     end
     sim_path = joinpath(path,sim_name)
-
+    sim_details_path = joinpath(sim_path, "$bathy_params")
     mkpath(sim_path)
     cd(sim_path)
+    mkpath(sim_details_path)
+    cd(sim_details_path)
     h5open("jl_simulation_data.h5", "w") do file
         file["h"] = h_array
         file["u"] = u_array

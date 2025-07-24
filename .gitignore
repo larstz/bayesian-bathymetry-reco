@@ -9,3 +9,4 @@ data
 *_test/
 LocalPreferences.toml
 !BathymetryReco/test/test_data/*
+config_*
