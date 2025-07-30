@@ -37,7 +37,7 @@ end
 export load_observation
 function load_observation(file_path::String, noise_var::Float64=0.0; sensor_id::Array{Int64}=[2, 3, 4], sensor_rate::Float64=0.001)
     id2pos = [3.5, 5.5, 7.5]
-    sensor_id = sensor_id .- 1 # convert to 1-based indexing
+    sensor_id = sensor_id .- 1 # convert to 1-based indexing (only Sensors 2, 3, 4 are stored in the file)
     file = joinpath(file_path, "jl_simulation_data.h5")
     h5open(file, "r") do file
         dt = attrs(file)["dt"]
@@ -63,6 +63,7 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
     measurement = CSV.read(file_path, DataFrame)
     id2pos = [3.5, 5.5, 7.5]
     sensor_id = sensor_id .- 1 # convert to 1-based indexing
+    sensor_pos = id2pos[sensor_id]
     # get noise information
     baseline_id = measurement.Time.<t_start
     base_measurement = Matrix(measurement[baseline_id,r"Sensor[2-4]"])./100 #convert cm to m
@@ -70,10 +71,10 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
 
     # extract relevant measurement data
     obs_id = t_start.<=measurement.Time.<=t_start+t_interval
-    observation = measurement[obs_id, sensor_id]
-    sensor_pos = id2pos[sensor_id]
+    observation = measurement[obs_id, :]
     t = round.(Vector(observation[:,"Time"]).-t_start, digits=2)
     observation_H = Matrix(observation[:,r"Sensor[2-4]"])./100 .+0.3 # add 30 cm to all measurements, convert cm to m
+    observation_H = observation_H[:, sensor_id] # select only the relevant sensors
     return observation_data(t, sensor_pos, [0.],observation_H, t_start, noise_std)
 end
 

@@ -67,13 +67,13 @@ end
 @testset "Test bathymetry" begin
     x = vec(collect(1.5:0.25:15.5))
     μ = 4.0
-    σ² = 0.1
+    σ² = 0.05
     scale = 0.2
     y = bathymetry(x, μ, σ², scale)
     @test size(y) == size(x)
-    @test y[1] ≈ scale*exp(-1/(σ²+1e-16)*(x[1]-μ)^2) atol=1e-16
-    @test y[11] ≈ scale*exp(-1/(σ²+1e-16)*(x[11]-μ)^2) atol=1e-16
-    @test y[51] ≈ scale*exp(-1/(σ²+1e-16)*(x[51]-μ)^2) atol=1e-16
+    @test y[1] ≈ scale*exp(-1/(2*σ²+1e-16)*(x[1]-μ)^2) atol=1e-16
+    @test y[11] ≈ scale*exp(-1/(2*σ²+1e-16)*(x[11]-μ)^2) atol=1e-16
+    @test y[51] ≈ scale*exp(-1/(2*σ²+1e-16)*(x[51]-μ)^2) atol=1e-16
 
     μ₁ = 3.0
     σ²₁ = 1.0
@@ -81,9 +81,9 @@ end
     σ²₂ = 1.0
     y2 = bathymetry(x, μ₁, σ²₁, μ₂, σ²₂)
     @test size(y2) == size(x)
-    @test y2[1] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[1]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[1]-μ₂)^2) atol=1e-16
-    @test y2[11] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[11]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[11]-μ₂)^2) atol=1e-16
-    @test y2[51] ≈ 0.2*exp(-1/(σ²₁+1e-16)*(x[51]-μ₁)^2) + 0.2*exp(-1/(σ²₂+1e-16)*(x[51]-μ₂)^2) atol=1e-16
+    @test y2[1] ≈ 0.2*exp(-1/(2*σ²₁+1e-16)*(x[1]-μ₁)^2) + 0.2*exp(-1/(2*σ²₂+1e-16)*(x[1]-μ₂)^2) atol=1e-16
+    @test y2[11] ≈ 0.2*exp(-1/(2*σ²₁+1e-16)*(x[11]-μ₁)^2) + 0.2*exp(-1/(2*σ²₂+1e-16)*(x[11]-μ₂)^2) atol=1e-16
+    @test y2[51] ≈ 0.2*exp(-1/(2*σ²₁+1e-16)*(x[51]-μ₁)^2) + 0.2*exp(-1/(2*σ²₂+1e-16)*(x[51]-μ₂)^2) atol=1e-16
 
     params = vec(sin.(x))
     yp = bathymetry(x, params)
@@ -121,8 +121,8 @@ end
     sim_params = load_config("./test_data/test_config.toml").sim_params
     obs_data, b = load_observation("./test_data/", sensor_rate=0.1)
     real_data = load_observation("./test_data/test_measurement.txt", sim_params.tstart, sim_params.tinterval)
-    sim_observations = simulation([4.0, 0.1, 0.2], sim_params, obs_data)
-    sim_real = simulation([4.0, 0.1, 0.2], sim_params, real_data)
+    sim_observations = simulation([4.0, 0.05, 0.2], sim_params, obs_data)
+    sim_real = simulation([4.0, 0.05, 0.2], sim_params, real_data)
     println(size(real_data.H))
     println(size(sim_real))
     @test size(sim_observations) == size(obs_data.H)
