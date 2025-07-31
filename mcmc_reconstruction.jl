@@ -1,6 +1,6 @@
 using Pkg
 Pkg.activate(".")
-Pkg.instantiate()
+#Pkg.instantiate()
 using Distributed
 
 addprocs(8)
@@ -15,9 +15,16 @@ using Plots
     using BathymetryReco
 end
 
+ENV["GKSwstype"]="nul"
+
 # Load the configuration
 println("#############################\nRead in config file" )
-config_file = abspath("config.toml")
+if isempty(ARGS)
+    config_file = abspath("config.toml")
+else
+    config_file = abspath(ARGS[1])
+end
+
 toml_config = TOML.parsefile(config_file)
 config = load_config(toml_config)
 sim_config = config.sim_params
@@ -33,7 +40,7 @@ else
 end
 
 # create plot of the observation signal
-ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface displacement [m]")
+ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface height [m]")
 plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
 exp_name = splitpath(obs_config.path)[end]
 
@@ -45,7 +52,7 @@ if store_exp
     mkpath(target_dir)
     plot_path = joinpath(target_dir,"plots")
     mkpath(plot_path)
-    savefig(ps, joinpath(plot_path,"observation_signal.pdf"))
+    savefig(ps, joinpath(plot_path,"observation_signal.png"))
 end
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
@@ -57,18 +64,26 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Normal(4.5,1), Uniform(0, 2)]
+prior_dist = [Uniform(1.5,12), Uniform(0.0,0.5)]
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 toml_config["sampler"]["prior"] = "$prior_dist"
 
+
 pos = Posterior(prior_dist, likelihood_dist)
 model = mcmc_model(pos, forward_model, obs_data)
 
 init_θ = mcmc_config.initial_θ
-if isempty(mcmc_config.initial_θ)
-    init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
+
+if isempty(init_θ)
+    #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
+    solver = swe_solver(sim_config)
+    #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
+    init_θ = [bathymetry(solver.domain.x, [4.0,0.5]) for i in 1:mcmc_config.n_chains]
+    toml_config["sampler"]["init"] = init_θ
+    inip = plot(solver.domain.x, init_θ[1])
+    savefig(inip, joinpath(plot_path, "initial_parameters.png"))
 end
 println("#############################")
 println(size(init_θ))
@@ -82,6 +97,8 @@ chain = pmap(1:mcmc_config.n_chains) do i
     sample_chain(model, mcmc_config, init_θ[i])
 end
 println("Chains finished \n#############################" )
+println(size(chain))
+println
 if store_exp
     mkpath(target_dir)
     cd(target_dir)
@@ -91,16 +108,19 @@ if store_exp
         TOML.print(io, toml_config)
     end
 
-    pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value")
-    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value")
+    pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright))
+    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright))
     # Serialize the chain
-    for (i, initial_θ) in enumerate(mcmc_config.initial_θ)
+    for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chain[i])
 
         # Plot the chain
-        plot!(pc,chain[i][:,1:end-1]; label=["μ_$i" "σ²_$i"]) # sampled parameters
-        plot!(plp, chain[i][:,end]; label="$i: log p(θ)") # log p of sample
+        plot!(pc,chain[i][:,1:end-2]; label=["μ_$i" "σ²_$i"]) # sampled parameters
+        plot!(plp, chain[i][:,end-1]; label="$i: log p(θ)") # log p of sample
+        plot!(pla, chain[i][:,end]; label="$i: α") # log p of sample
     end
-    savefig(pc, "./plots/chain.pdf")
-    savefig(plp, "./plots/logp.pdf")
+    savefig(pc, "./plots/chain.png")
+    savefig(plp, "./plots/logp.png")
+    savefig(pla, "./plots/acceptance_rate.png")
 end

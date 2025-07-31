@@ -4,6 +4,7 @@ Pkg.instantiate()
 using HDF5
 using Plots
 using TOML
+using LaTeXStrings
 
 sim_name = "data/toy_measurement/waterchannel_exact_bathy"
 cd(sim_name)
@@ -37,13 +38,13 @@ end
 # Plot initial conditions
 p = plot(data.x, data.H[1, :], color = :midnightblue, linewidth = 2, label = "h(x, 0)")
 plot!(p, data.x, data.bathymetry, color = :brown, linewidth = 2, label = "b(x)")
-vline!(p, data.sensor_pos, color = :black, linestyle = :dash, linewidth = 1)
+vline!(p, data.sensor_pos, color = :black, linestyle = :dash, linewidth = 1, label="")
 scatter!(p, data.sensor_pos, data.H_sensor[1, :], color = :green, label = "sensor")
 xlabel!("x [m]")
 ylabel!("z [m]")
 title!("Initial waterlevel")
 plot!(p, legend=:right)
-savefig(p,"initial_conditions_plots.png")
+savefig(p,"initial_conditions_plots.pdf")
 
 # # Plot the sensors
 p = plot(data.t, data.H_sensor, linewidth = 2, label = reshape(["Sensor $i" for i in 2:4], 1, 3))
@@ -51,7 +52,7 @@ xlabel!("t [s]")
 ylabel!("z [m]")
 title!("Sensor positions")
 plot!(p, legend=:topleft)
-savefig(p,"sensor_positions_plots.png")
+savefig(p,"sensor_positions_plots.pdf")
 # fig = Figure()
 # ax1 = Axis(fig[1, 1], xlabel = "x [m]", ylabel = "z [m]", title = "Sensor positions")
 # series!(ax1, data.t, data.H_sensor', linewidth = 2, label = ["Sensor $i" for i in 2:4])
@@ -60,7 +61,7 @@ savefig(p,"sensor_positions_plots.png")
 
 # # Plot the waterlevel
 p = surface(data.x, data.t, data.H, colormap = :viridis, xlabel = "x [m]", ylabel = "t [s]", zlabel="z [m]", title = "Waterlevel")
-savefig(p,"waterlevel_plots.png")
+savefig(p,"waterlevel_plots.pdf")
 # fig = Figure()
 # ax1 = Axis3(fig[1, 1], ylabel = "x [m]", xlabel = "t [s]", zlabel="z [m]", title = "Waterlevel")
 # surface!(ax1, data.x, data.t, data.H', colormap = :viridis, interpolate=false)

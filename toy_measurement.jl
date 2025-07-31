@@ -1,75 +1,72 @@
 using Pkg
 Pkg.activate(".")
-using Distributions
 using TOML
-using Dates
-using PyCall
-using Interpolations
-using Plots
-using Serialization
-# Import the SWESolver class from the utils module
-@pyimport swe_wrapper as swe
 using HDF5
+using BathymetryReco
 
 cd(@__DIR__)
 
 #TODO pass config file as command line argument
-config = TOML.parsefile("simulation_config.toml")
+config_file = abspath("simulation_config.toml")
+config = TOML.parsefile(config_file)
+sim_config = read_simulation_parameters(config["simulation"])
 
-path = config["output"]["path"]
+xbounds = sim_config.xbounds
+nx =  sim_config.nx
+total_t = sim_config.tinterval
+tstart = sim_config.tstart
+timestep = sim_config.timestep
+g = sim_config.g
+kappa = sim_config.kappa
+dealias = sim_config.dealias
+problemtype = sim_config.scenario
+problem_bathy = sim_config.bathy_name
+bc_file = sim_config.bc_file
 
-mkpath(path)
-
-sim_params = config["simulation"]
-xbounds = sim_params["xbounds"]
-nx =  sim_params["nx"]
-total_t = sim_params["tinterval"]
-tstart = sim_params["tstart"]
-timestep = sim_params["timestep"]
-g = sim_params["g"]
-kappa = sim_params["kappa"]
-dealias = sim_params["dealias"]
-problemtype = sim_params["scenario"]
-problem_bathy = sim_params["bathymetry"]
-
-solver = swe.SWESolver(xbounds, timestep, nx, total_t,
-                        tstart=tstart, g=g, kappa=kappa, dealias=dealias,
-                        problemtype=problemtype)
+solver = swe_solver(sim_config);
 
 x = solver.domain.x
 
 # Set up the bathymetry
-bathy_config = config["bathymetry"]
-bathy_params = bathy_config["parameters"]
+bathy_config = read_bathymetry_parameters(config["bathymetry"])
+bathy_params = bathy_config.θ
+npeaks = bathy_config.n_peaks
 
 bathy = zero(x)
 
 if problem_bathy == "gaussian"
-    param_tuples =  length(bathy_params)/2 == bathy_config["npeaks"] ?
-    [(bathy_params[i], bathy_params[i+1]) for i in 1:2:length(bathy_params)] : println("Number of peaks and number of parameters doesn't match!")
+    param_tuples =  length(bathy_params)/2 == npeaks ?
+    [[bathy_params[i], bathy_params[i+1]] for i in 1:2:length(bathy_params)] : println("Number of peaks and number of parameters doesn't match!")
     for params in param_tuples
-       global bathy += swe.gaussian_bathymetry(x, params)
+       global bathy += bathymetry(x, params)
     end
 elseif  problem_bathy == "exact_bathy"
-    global bathy = swe.rampFunc(x)
+    global bathy = exp_bathymetry(x)
 else
     println("Requested bathymetry type not available")
 end
 
 println("Start Simulation")
-H_sensor, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=sim_params["sensor_position"])
+H_sensor, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=sim_config.sensor_pos)
 println("Simulation Done")
 dx = (xbounds[2]-xbounds[1])/nx
 
-if config["output"]["save"]
+
+io_config = read_io_settings(config["output"])
+path = io_config.output_dir
+
+if io_config.save
+    mkpath(path)
     sim_name = "$(problemtype)_$(problem_bathy)"
     if problem_bathy == "gaussian"
-        sim_name *= "_$(bathy_config["npeaks"])_peaks"
+        sim_name *= "_$(npeaks)_peaks"
     end
     sim_path = joinpath(path,sim_name)
-
+    sim_details_path = joinpath(sim_path, "$bathy_params")
     mkpath(sim_path)
     cd(sim_path)
+    mkpath(sim_details_path)
+    cd(sim_details_path)
     h5open("jl_simulation_data.h5", "w") do file
         file["h"] = h_array
         file["u"] = u_array
@@ -87,7 +84,7 @@ if config["output"]["save"]
         attributes(file)["kappa"] = kappa
         attributes(file)["M"] = nx
         if problem_bathy == "gaussian"
-            attributes(file)["npeaks"] = bathy_config["npeaks"]
+            attributes(file)["npeaks"] = npeaks
             attributes(file)["bathy_params"] = bathy_params
         end
     end

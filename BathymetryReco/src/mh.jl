@@ -12,6 +12,10 @@ function loglikelihood(p::Posterior, x)
     return logpdf.(p.likelihood, x)
 end
 
+function loglikelihood(p::Posterior, x, obs)
+    return -length(x)*0.5 * log(2π) -length(x)*log(p.likelihood.σ) - 1/ (2 * p.likelihood.σ^2)* sum((x - obs).^2 )
+end
+
 export mcmc_model
 struct mcmc_model
     posterior::Posterior
@@ -28,7 +32,7 @@ function logjoint(model::mcmc_model , x)
 
     try
         sim_observations = model.forward(x)
-        log_likelihood = sum(loglikelihood(model.posterior, sim_observations - model.observation.H))
+        log_likelihood = sum(loglikelihood(model.posterior, sim_observations, model.observation.H))
         return log_prior + log_likelihood
     catch err
         if isa(err, DimensionMismatch) || isa(err, BoundsError)
@@ -43,21 +47,28 @@ end
 
 export sample_chain
 function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=Progress(n), γ=0.1, burn_in=0)
-    chain = zeros(n-burn_in+1, length(initial_θ)+1)
+    chain = zeros(n-burn_in+1, length(initial_θ)+2)
     θ = initial_θ
     logp = logjoint(model, θ)
-    chain[1, :] = [θ..., logp]
+    chain[1, :] = [θ..., logp, 1.0]
+    acceptance_rate = 1.0
+    accepted = 1
+    #β = 0.1
     for i in 1:n
-        θ_new = θ + γ .* rand(Normal(0,1), size(θ))
 
+        #temp_proposal = γ .* rand(Normal(0,1), size(θ))
+        #θ_new = √(1-β^2) .* θ + β .* temp_proposal #γ .* rand(Normal(0,1), size(θ))
+        θ_new = θ + γ .* rand(Normal(0,1), size(θ))
         logp_new = logjoint(model, θ_new)
 
-        if log(rand()) < logp_new - logp
+        if (rand()) < exp(logp_new - logp)
+            accepted += 1
             θ = θ_new
             logp = logp_new
         end
+        acceptance_rate = accepted / (i+1)
         if i > burn_in
-            chain[i-burn_in+1, :] = [θ..., logp]
+            chain[i-burn_in+1, :] = [θ..., logp, acceptance_rate]
         end
         if verbose
             next!(logging)
