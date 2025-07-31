@@ -10,3 +10,8 @@ data
 LocalPreferences.toml
 !BathymetryReco/test/test_data/*
 config_*
+plots
+bananatest.jl
+suggested_priors.jl
+advection_example/advection_notebook.jl
+*.pdf
