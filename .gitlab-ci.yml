@@ -4,11 +4,12 @@ before_script:
   - apt-get update -y && apt-get install -y procps
   - apt-get -y install libopenmpi-dev
   - julia -e "println(VERSION)"
-  - curl -L micro.mamba.pm/install.sh | bash
-  - source ~/.bashrc
+  - curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+  - bash Miniforge3-$(uname)-$(uname -m).sh -b -p "${HOME}/conda"
+  - source "${HOME}/conda/etc/profile.d/conda.sh"
 
 test:
   script:
-    - micromamba create -y -f requirements.yml
-    - micromamba activate swe
+    - conda create -y -f requirements.yml
+    - conda activate swe
     - julia -e 'using Pkg; Pkg.activate("BathymetryReco"); Pkg.instantiate(); Pkg.test()'
