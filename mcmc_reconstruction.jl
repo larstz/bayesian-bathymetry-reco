@@ -64,7 +64,7 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Uniform(1.5,12), Uniform(0.0,0.5)]
+prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)]
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
@@ -80,7 +80,7 @@ if isempty(init_θ)
     #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
     solver = swe_solver(sim_config)
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
-    init_θ = [bathymetry(solver.domain.x, [4.0,0.5]) for i in 1:mcmc_config.n_chains]
+    init_θ = [bathymetry(solver.domain.x, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
     toml_config["sampler"]["init"] = init_θ
     inip = plot(solver.domain.x, init_θ[1])
     savefig(inip, joinpath(plot_path, "initial_parameters.png"))
@@ -109,8 +109,8 @@ if store_exp
     end
 
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value", legend=:outerright)
-    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright))
-    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright))
+    plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright)
     # Serialize the chain
     for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chain[i])

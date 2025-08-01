@@ -15,3 +15,4 @@ bananatest.jl
 suggested_priors.jl
 advection_example/advection_notebook.jl
 *.pdf
+BathymetryReco/src/swe_wrapper/build/*

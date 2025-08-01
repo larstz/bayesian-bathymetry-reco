@@ -58,7 +58,7 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
 
         #temp_proposal = γ .* rand(Normal(0,1), size(θ))
         #θ_new = √(1-β^2) .* θ + β .* temp_proposal #γ .* rand(Normal(0,1), size(θ))
-        θ_new = θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ)))))
+        θ_new = max.(θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ))))), 0.0)
         logp_new = logjoint(model, θ_new)
 
         if (rand()) < exp(logp_new - logp)
