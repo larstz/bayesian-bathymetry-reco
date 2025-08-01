@@ -7,6 +7,7 @@ module BathymetryReco
     using DataFrames
     using CSV
     using LinearAlgebra
+    using DataInterpolations
     using PyCall
     using ProgressMeter
 

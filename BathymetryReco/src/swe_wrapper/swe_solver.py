@@ -1,4 +1,3 @@
-from time import time
 import numpy as np
 import dedalus.public as d3
 from scipy import interpolate
@@ -218,8 +217,6 @@ class WaterChannelSolver(Solver):
         # Build solver
         solver = problem.build_solver(d3.RK443)
         return solver
-
-#! TODO: Implement left boundary condition
 
 
 class SWESolver():

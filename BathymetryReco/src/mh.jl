@@ -4,16 +4,16 @@ struct Posterior{T1<:Distribution, T2<:Distribution}
     likelihood::Union{T2, Array{T2}}
 end
 
-function logprior(p::Posterior, x)
-    return logpdf.(p.prior, x)
+function logprior(p::Posterior, θ)
+    return logpdf.(p.prior, θ)
 end
 
-function loglikelihood(p::Posterior, x)
-    return logpdf.(p.likelihood, x)
+function loglikelihood(p::Posterior, θ)
+    return logpdf.(p.likelihood, θ)
 end
 
-function loglikelihood(p::Posterior, x, obs)
-    return -length(x)*0.5 * log(2π) -length(x)*log(p.likelihood.σ) - 1/ (2 * p.likelihood.σ^2)* sum((x - obs).^2 )
+function loglikelihood(p::Posterior, θ, obs)
+    return -length(θ)*0.5 * log(2π) -length(θ)*log(p.likelihood.σ) - 1/ (2 * p.likelihood.σ^2)* sum((θ - obs).^2 )
 end
 
 export mcmc_model
@@ -24,20 +24,20 @@ struct mcmc_model
 end
 
 export logjoint
-function logjoint(model::mcmc_model , x)
-    log_prior = sum(logprior(model.posterior,x))
+function logjoint(model::mcmc_model, θ)
+    log_prior = sum(logprior(model.posterior, θ))
     if log_prior == -Inf
         return -Inf
     end
 
     try
-        sim_observations = model.forward(x)
-        log_likelihood = sum(loglikelihood(model.posterior, sim_observations, model.observation.H))
+        sim_observations = model.forward(θ)
+        log_likelihood = sum(loglikelihood(model.posterior, sim_observations .- model.observation.H))
         return log_prior + log_likelihood
     catch err
         if isa(err, DimensionMismatch) || isa(err, BoundsError)
             println("Dimension mismatch or bounds error in forward model / likelihood.")
-            println("Current parameters: ", x)
+            println("Current parameters: ", θ)
             return -Inf
         else
             rethrow(err)
