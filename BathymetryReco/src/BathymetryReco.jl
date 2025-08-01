@@ -1,15 +1,16 @@
 module BathymetryReco
 
+    using CSV
+    using DataFrames
+    using DataInterpolations
     using Distributions
+    using HDF5
+    using LinearAlgebra
+    using PDMats
+    using ProgressMeter
+    using PyCall
     using Statistics
     using TOML
-    using HDF5
-    using DataFrames
-    using CSV
-    using LinearAlgebra
-    using DataInterpolations
-    using PyCall
-    using ProgressMeter
 
     swe = PyNULL()
 
