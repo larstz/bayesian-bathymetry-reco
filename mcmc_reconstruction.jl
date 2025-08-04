@@ -3,7 +3,7 @@ Pkg.activate(".")
 #Pkg.instantiate()
 using Distributed
 
-addprocs(8)
+addprocs(1)
 
 using Dates
 using TOML
@@ -77,12 +77,12 @@ model = mcmc_model(pos, forward_model, obs_data)
 init_θ = mcmc_config.initial_θ
 
 if isempty(init_θ)
+    xg = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=sim_config.nx))
     #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
-    solver = swe_solver(sim_config)
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
-    init_θ = [bathymetry(solver.domain.x, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
+    init_θ = [bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
     toml_config["sampler"]["init"] = init_θ
-    inip = plot(solver.domain.x, init_θ[1])
+    inip = plot(xg, init_θ[1])
     savefig(inip, joinpath(plot_path, "initial_parameters.png"))
 end
 println("#############################")
