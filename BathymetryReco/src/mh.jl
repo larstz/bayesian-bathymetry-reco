@@ -71,7 +71,7 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
             chain[i-burn_in+1, :] = [θ..., logp, acceptance_rate]
         end
         if verbose
-            next!(logging)
+            next!(logging, showvalues = [("iteration count",i)])
         end
     end
     return chain
