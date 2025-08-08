@@ -52,7 +52,9 @@ if store_exp
     savefig(ps, joinpath(plot_path,"observation_signal.png"))
 end
 
-forward_model(params) = simulation(params, sim_config, obs_data)
+solver = swe_solver(sim_config)
+
+forward_model(params) = simulation(params, solver, obs_data)
 
 likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
@@ -78,6 +80,7 @@ if isempty(init_θ)
     #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
     init_θ = [bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
+    init_θ[1] .= 0.0 # set first chain to zero
     toml_config["sampler"]["init"] = init_θ
     inip = plot(xg, init_θ[1])
     savefig(inip, joinpath(plot_path, "initial_parameters.png"))
