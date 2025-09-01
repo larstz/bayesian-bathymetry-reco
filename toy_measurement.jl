@@ -62,7 +62,7 @@ if io_config.save
         sim_name *= "_$(npeaks)_peaks"
     end
     sim_path = joinpath(path,sim_name)
-    sim_details_path = joinpath(sim_path, "$bathy_params")
+    sim_details_path = "$bathy_params"
     mkpath(sim_path)
     cd(sim_path)
     mkpath(sim_details_path)

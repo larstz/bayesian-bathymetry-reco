@@ -25,9 +25,9 @@ initial = []
 n_chains = 1
 
 [observation]
-#path = "./data/experiment_data/data_sensors/With_Bathymetry/Heat1.txt"
-path = "./data/toy_measurement/waterchannel_exact_bathy/"
-real_data = false
+path = "./data/experiment_data/Heat1.txt"
+#path = "./data/toy_measurement/waterchannel_exact_bathy/"
+real_data = true
 noise_var = 0.05
 sensor_rate = 0.01
 sensor_id = [2,3,4] # Sensor IDs to use, must be in [2, 3, 4]

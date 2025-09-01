@@ -8,6 +8,7 @@ using Serialization
 using Plots
 
 using Distributions
+using PDMats
 using BathymetryReco
 using ProgressMeter
 
@@ -63,7 +64,10 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)]
+xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=sim_config.nx))
+s = 0.005.*exp.(-1/(xs[3]-xs[1]).^2 .*(xs.-xs').^2) # smooth prior
+# prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)] # sparse prior
+prior_dist = [Cauchy(0., 0.01), MvNormal(zeros(sim_config.nx), PDMat(s))] # sqexp prior
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
@@ -80,7 +84,7 @@ if isempty(init_θ)
     #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
     init_θ = [bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
-    init_θ[1] .= 0.0 # set first chain to zero
+    init_θ[1] .= exp_bathymetry(xg)#0.0 # set first chain to correct bathymetry
     toml_config["sampler"]["init"] = init_θ
     inip = plot(xg, init_θ[1])
     savefig(inip, joinpath(plot_path, "initial_parameters.png"))
@@ -114,16 +118,22 @@ if store_exp
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value", legend=:outerright)
     plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright)
     pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    pll = plot(;title="Chain log likelihood", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    plprior = plot(;title="Chain log prior", xlabel="Iteration", ylabel="Value", legend=:outerright)
     # Serialize the chain
     for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chains[i])
 
         # Plot the chain
-        plot!(pc,chains[i][:,1:end-2]; label=["μ_$i" "σ²_$i"]) # sampled parameters
-        plot!(plp, chains[i][:,end-1]; label="$i: log p(θ)") # log p of sample
-        plot!(pla, chains[i][:,end]; label="$i: α") # log p of sample
+        plot!(pc,chains[i][:,1:end-4]; label="") # sampled parameters
+        plot!(plp, chains[i][:,end-3]; label="$i: log p(θ)") # log p
+        plot!(pll, chains[i][:,end-2]; label="$i: log likelihood") # log likelihood
+        plot!(plprior, chains[i][:,end-1]; label="$i: log prior") # log prior
+        plot!(pla, chains[i][:,end]; label="$i: α") # acceptance rate
     end
     savefig(pc, "./plots/chain.png")
     savefig(plp, "./plots/logp.png")
+    savefig(pll, "./plots/loglikelihood.png")
+    savefig(plprior, "./plots/logprior.png")
     savefig(pla, "./plots/acceptance_rate.png")
 end

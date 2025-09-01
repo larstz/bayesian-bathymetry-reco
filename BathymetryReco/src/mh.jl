@@ -5,7 +5,11 @@ struct Posterior{T1<:Distribution, T2<:Distribution}
 end
 
 function logprior(p::Posterior, θ)
-    return logpdf.(p.prior, θ)
+    logp = 0.0
+    for lp in p.prior
+        logp += sum(logpdf(lp, θ))
+    end
+    return logp
 end
 
 function loglikelihood(p::Posterior, θ)
@@ -27,18 +31,18 @@ export logjoint
 function logjoint(model::mcmc_model, θ)
     log_prior = sum(logprior(model.posterior, θ))
     if log_prior == -Inf
-        return -Inf
+        return -Inf, 0.0, -Inf
     end
 
     try
         sim_observations = model.forward(θ)
         log_likelihood = sum(loglikelihood(model.posterior, sim_observations .- model.observation.H))
-        return log_prior + log_likelihood
+        return log_prior + log_likelihood, log_likelihood, log_prior
     catch err
         if isa(err, DimensionMismatch) || isa(err, BoundsError)
             println("Dimension mismatch or bounds error in forward model / likelihood.")
             println("Current parameters: ", θ)
-            return -Inf
+            return -Inf, -Inf, log_prior
         else
             rethrow(err)
         end
@@ -47,10 +51,10 @@ end
 
 export sample_chain
 function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=Progress(n), γ=0.1, burn_in=0)
-    chain = zeros(n-burn_in+1, length(initial_θ)+2)
+    chain = zeros(n-burn_in+1, length(initial_θ)+4)
     θ = initial_θ
-    logp = logjoint(model, θ)
-    chain[1, :] = [θ..., logp, 1.0]
+    lpost, ll, lp = logjoint(model, θ)
+    chain[1, :] = [θ..., lpost, ll, lp, 1.0]
     acceptance_rate = 1.0
     accepted = 1
     #β = 0.1
@@ -58,17 +62,17 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
 
         #temp_proposal = γ .* rand(Normal(0,1), size(θ))
         #θ_new = √(1-β^2) .* θ + β .* temp_proposal #γ .* rand(Normal(0,1), size(θ))
-        θ_new = max.(θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ))))), 0.0)
-        logp_new = logjoint(model, θ_new)
+        θ_new = θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ)))))
+        lpost_new, ll_new, lp_new = logjoint(model, θ_new)
 
-        if (rand()) < exp(logp_new - logp)
+        if (rand()) < exp(lpost_new - lpost)
             accepted += 1
             θ = θ_new
-            logp = logp_new
+            lpost = lpost_new
         end
         acceptance_rate = accepted / (i+1)
         if i > burn_in
-            chain[i-burn_in+1, :] = [θ..., logp, acceptance_rate]
+            chain[i-burn_in+1, :] = [θ..., lpost, ll_new, lp_new, acceptance_rate]
         end
         if verbose
             next!(logging, showvalues = [("iteration count",i)])
