@@ -24,6 +24,7 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 SliceSampling = "43f4d3e8-9711-4a8c-bd1b-03ac73a255cf"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+UncertaintyQuantification = "7183a548-a887-11e9-15ce-a56ab60bad7a"
 
 [extras]
 HDF5_jll = "0234f1f7-429e-5d53-9886-15a909be8d59"
