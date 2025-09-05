@@ -62,6 +62,8 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
 
         #temp_proposal = γ .* rand(Normal(0,1), size(θ))
         #θ_new = √(1-β^2) .* θ + β .* temp_proposal #γ .* rand(Normal(0,1), size(θ))
+        # pCN, β∈[0,1]
+        # θ_new = rand(MvNormal(√(1-β^2) .* θ, PDiagMat(β^2 .* ones(length(θ)))))
         θ_new = θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ)))))
         lpost_new, ll_new, lp_new = logjoint(model, θ_new)
 

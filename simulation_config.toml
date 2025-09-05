@@ -8,10 +8,10 @@ path = "./data/toy_measurement"
 xbounds = [1.5, 15.0]
 dealias = 1.5
 scenario = "waterchannel"
-nx = 128
-timestep = 5.0e-5
+nx = 64
+timestep = 1e-2
 kappa = 0.2
-bathymetry = "gaussian"
+bathymetry = "exact_bathy"
 sensor_position = [3.5, 5.5, 7.5]
 tinterval = 10
 g = 9.81
@@ -19,5 +19,5 @@ bc_file = "./data/mean_bc.txt"
 tstart = 32
 
 [bathymetry]
-parameters = [4.0, 0.35]
+parameters = [4.0, 0.5]
 npeaks = 1

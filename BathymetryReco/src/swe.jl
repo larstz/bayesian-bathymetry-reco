@@ -6,7 +6,7 @@ function simulation(param, sim_params::simulation_setup, observation::observatio
                             tstart=observation.tstart,
                             problemtype=sim_params.scenario, bc_file=sim_params.bc_file);
     #TODO: add possibility to pass discretization of bathymetry
-    equi_x = range(sim_params.xbounds[1], sim_params.xbounds[2], sim_params.nx)
+    equi_x = range(sim_params.xbounds[1], sim_params.xbounds[2], length(param))
     sample_bathy = bathymetry(equi_x, param)
     solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
     sim_observations, t_sim, _, _ = solver.solve(solver_bathy, sensor_pos=observation.x)
@@ -20,7 +20,7 @@ end
 
 function simulation(param, solver::PyObject, observation::observation_data)
 
-    equi_x = range(solver.xbound[1], solver.xbound[2], solver.nx)
+    equi_x = range(solver.xbound[1], solver.xbound[2], length(param))
     sample_bathy = bathymetry(equi_x, param)
     solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
 

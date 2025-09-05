@@ -3,7 +3,7 @@ title = "MH Bathymetry Reco setup"
 [simulation]
 xbounds = [1.5, 15.0]
 timestep = 1e-2
-nx =  64
+nx =  128
 tstart = 32
 tinterval = 10
 g = 9.81
@@ -15,9 +15,10 @@ bc_file = "./data/mean_bc.txt"
 bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
 [sampler]
-stepsize = [0.001]
+stepsize = [0.0015]
 likelihood_var = 0.001
 n_samples = 10000
+nx= 64
 burn_in = 0
 prior = "Normal{Float64}[Normal{Float64}(μ=4.0, σ=1.0), Normal{Float64}(μ=0.1, σ=0.1)]"
 #[[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5, 1.0], [6.0, 0.1]]

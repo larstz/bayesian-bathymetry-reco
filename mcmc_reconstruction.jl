@@ -80,7 +80,7 @@ if isempty(init_θ)
     xg = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=sim_config.nx))
     #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
-    init_θ = [bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
+    init_θ = [zeros(mcmc_config.nx)]#[bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
     toml_config["sampler"]["init"] = init_θ
     inip = plot(xg, init_θ[1])
     savefig(inip, joinpath(plot_path, "initial_parameters.png"))

@@ -8,13 +8,14 @@ using MCMCChains
 
 println("#############################\nRead in chain" )
 
-exp = ARGS[1] #"./data/results/Heat1.txt_2025-08-14-13-11-17_fine96"
+exp = "data/results/Heat1.txt_2025-09-03-15-03-05"
+ani = false
 chain = deserialize(joinpath(exp, "chain_1.jls"))
 
 config = load_config(joinpath(exp, "experiment_config.toml"))
 sim_config = config.sim_params
 
-burnin = 0
+burnin = 2500
 
 bathy = chain[burnin+1:end,1:sim_config.nx]
 lp = chain[burnin+1:end,sim_config.nx+1]
@@ -23,6 +24,7 @@ ar = chain[burnin+1:end,sim_config.nx+2]
 xs = range(1.5,15.0,sim_config.nx)
 exact_b = exp_bathymetry(xs)
 
+if ani
 println("#############################\nCreate Gif" )
 
 anim = @animate for (i, b) in enumerate(eachrow(bathy[1:10:end,:]))
@@ -31,7 +33,7 @@ anim = @animate for (i, b) in enumerate(eachrow(bathy[1:10:end,:]))
 end every 10
 
 gif(anim, exp*"/plots/chain_progression.gif", fps=10)
-
+end
 println("#############################\nCreate error plot" )
 
 mean_bathy = vec(mean(bathy, dims=1))
@@ -40,6 +42,8 @@ bathy_l2 = sqrt(sum((mean_bathy .- exact_b).^2))/sqrt(sum(exact_b.^2))*100
 bathy_linf = maximum(abs.(mean_bathy .- exact_b))/maximum(exact_b)*100
 mcmc_chain = Chains(bathy)
 grid_error = mcse(mcmc_chain)[:, :mcse]
+grid_ci_low = hpd(mcmc_chain)[:, :lower]
+grid_ci_high = hpd(mcmc_chain)[:, :upper]
 
 error_plot = scatter(xs, mean_bathy, yerror=grid_error, label="Mean of last $(size(bathy)[1]-burnin) samples", markersize=2,
      ylims=(-0.01,0.21), xlabel="x", ylabel="b(x)", title="Bathymetry Sample Mean: NRMSE = $(round(bathy_nrmse, digits=3))%")
@@ -47,4 +51,5 @@ plot!(error_plot, xs, mean_bathy; label="NRMSE = $(round(bathy_nrmse, digits=3))
 plot!(error_plot, xs, exact_b, label="True Bathymetry", color=:black)
 scatter!([3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
 savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).png")
+savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).pdf")
 println("Store at $(exp*"/plots/mean_bathy_errorbars.png")")

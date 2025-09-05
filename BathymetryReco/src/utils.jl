@@ -97,6 +97,7 @@ end
 export mcmc_setup
 struct mcmc_setup
     n::Int
+    dim::Int
     n_chains::Int
     γ::Union{Float64, Array{Float64, 1}}
     burn_in::Int
@@ -174,12 +175,13 @@ end
 export read_mcmc_parameters
 function read_mcmc_parameters(config::Dict{String,Any})
     n = config["n_samples"]
+    dim = config["nx"]
     n_chains = config["n_chains"]
     γ = config["stepsize"]
     burn_in = config["burn_in"]
     likelihood_σ = config["likelihood_var"]
     init = config["initial"]
-    mcmc_params = mcmc_setup(n, n_chains, γ, burn_in, likelihood_σ,init)
+    mcmc_params = mcmc_setup(n, dim, n_chains, γ, burn_in, likelihood_σ,init)
     return mcmc_params
 end
 
