@@ -13,7 +13,7 @@ function logprior(p::Posterior, θ)
 end
 
 function loglikelihood(p::Posterior, θ)
-    return logpdf.(p.likelihood, θ)
+    return logpdf(p.likelihood, θ')
 end
 
 function loglikelihood(p::Posterior, θ, obs)
@@ -90,3 +90,21 @@ end
 function sample_chain(model::mcmc_model, setup::mcmc_setup, initial_θ; kargs...)
     return sample_chain(model, setup.n, initial_θ;γ=setup.γ, burn_in=setup.burn_in, kargs...)
 end
+
+# function propose_new(θ, γ, proposal)
+#     return proposal(θ, γ)
+# end
+
+# struct RandomWalkProposal
+
+
+# end
+# struct pCNProposal end
+
+# function rmwh_proposal(θ, γ)
+#     return θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ)))))
+# end
+
+# function pCN(θ, β)
+#     return rand(MvNormal(√(1-β^2) .* θ, PDiagMat(β^2 .* ones(length(θ)))))
+# end

@@ -16,7 +16,7 @@ bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
 [sampler]
 stepsize = [0.0015]
-likelihood_var = 0.001
+likelihood_var = 0.0
 n_samples = 10000
 nx= 64
 burn_in = 0

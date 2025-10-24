@@ -8,20 +8,21 @@ using MCMCChains
 
 println("#############################\nRead in chain" )
 
-exp = "data/results/Heat1.txt_2025-09-03-15-03-05"
+exp = "data/results/waterchannel_exact_bathy_2025-09-05-15-25-19"
 ani = false
 chain = deserialize(joinpath(exp, "chain_1.jls"))
 
 config = load_config(joinpath(exp, "experiment_config.toml"))
 sim_config = config.sim_params
+mcmc_config = config.mcmc_params
 
-burnin = 2500
+burnin = 2000
 
-bathy = chain[burnin+1:end,1:sim_config.nx]
-lp = chain[burnin+1:end,sim_config.nx+1]
-ar = chain[burnin+1:end,sim_config.nx+2]
+bathy = chain[burnin+1:end,1:mcmc_config.dim]
+lp = chain[burnin+1:end,mcmc_config.dim+1]
+ar = chain[burnin+1:end,mcmc_config.dim+2]
 
-xs = range(1.5,15.0,sim_config.nx)
+xs = range(1.5,15.0,mcmc_config.dim)
 exact_b = exp_bathymetry(xs)
 
 if ani
