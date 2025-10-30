@@ -8,15 +8,26 @@ using MCMCChains
 
 println("#############################\nRead in chain" )
 
-exp = "data/results/waterchannel_exact_bathy_2025-09-05-15-25-19"
+exp = "data/Heat1.txt_2025-08-14-13-12-25"
 ani = false
 chain = deserialize(joinpath(exp, "chain_1.jls"))
 
 config = load_config(joinpath(exp, "experiment_config.toml"))
 sim_config = config.sim_params
 mcmc_config = config.mcmc_params
+obs_config = config.obs_settings
 
-burnin = 2000
+# Load the data
+if obs_config.real_data
+    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
+else
+    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+end
+
+solver = swe_solver(sim_config)
+forward(params) = simulation(params, solver, obs_data)
+
+burnin = 2500
 
 bathy = chain[burnin+1:end,1:mcmc_config.dim]
 lp = chain[burnin+1:end,mcmc_config.dim+1]
@@ -47,10 +58,15 @@ grid_ci_low = hpd(mcmc_chain)[:, :lower]
 grid_ci_high = hpd(mcmc_chain)[:, :upper]
 
 error_plot = scatter(xs, mean_bathy, yerror=grid_error, label="Mean of last $(size(bathy)[1]-burnin) samples", markersize=2,
-     ylims=(-0.01,0.21), xlabel="x", ylabel="b(x)", title="Bathymetry Sample Mean: NRMSE = $(round(bathy_nrmse, digits=3))%")
+     ylims=(-0.055,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean: NRMSE = $(round(bathy_nrmse, digits=3))%")
 plot!(error_plot, xs, mean_bathy; label="NRMSE = $(round(bathy_nrmse, digits=3))% \n l2 = $(round(bathy_l2, digits=3))% \n linf = $(round(bathy_linf, digits=3))%")
 plot!(error_plot, xs, exact_b, label="True Bathymetry", color=:black)
 scatter!([3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
 savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).png")
 savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).pdf")
 println("Store at $(exp*"/plots/mean_bathy_errorbars.png")")
+
+ciplot = plot(xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .- mean_bathy), label="95% Credible Interval",
+    ylims=(-0.01,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
+plot!(xs, mean_bathy; label=label="NRMSE = $(round(bathy_nrmse, digits=3))% \n l2 = $(round(bathy_l2, digits=3))% \n linf = $(round(bathy_linf, digits=3))%")
+plot!(ciplot, xs, exact_b; label="Exact bathymetry", color=:black)
