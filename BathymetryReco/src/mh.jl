@@ -13,7 +13,7 @@ function logprior(p::Posterior, θ)
 end
 
 function loglikelihood(p::Posterior, θ)
-    return logpdf(p.likelihood, θ')
+    return logpdf.(p.likelihood, θ')
 end
 
 function loglikelihood(p::Posterior, θ, obs)
@@ -71,10 +71,12 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
             accepted += 1
             θ = θ_new
             lpost = lpost_new
+            ll = ll_new
+            lp = lp_new
         end
         acceptance_rate = accepted / (i+1)
         if i > burn_in
-            chain[i-burn_in+1, :] = [θ..., lpost, ll_new, lp_new, acceptance_rate]
+            chain[i-burn_in+1, :] = [θ..., lpost, ll, lp, acceptance_rate]
         end
         if verbose
             next!(logging, showvalues = [("iteration count",i)])

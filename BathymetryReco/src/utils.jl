@@ -101,7 +101,7 @@ struct mcmc_setup
     n_chains::Int
     γ::Union{Float64, Array{Float64, 1}}
     burn_in::Int
-    likelihood_σ::Float64
+    likelihood_σ::Union{Float64, Array{Float64, 1}}
     initial_θ::Union{Array{Float64, 1}, Array{Array{Float64, 1}, 1}, Array{Union{}, 1}}
 end
 

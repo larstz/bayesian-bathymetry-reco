@@ -11,6 +11,7 @@ module BathymetryReco
     using PyCall
     using Statistics
     using TOML
+    using ApproxFun
 
     swe = PyNULL()
 

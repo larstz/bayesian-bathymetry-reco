@@ -61,16 +61,16 @@ likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
     max_signal = [0.0015, 0.003, 0.003]
     #likelihood_σ = maximum(obs_data.noise_std' ./ max_signal) # replace later by individual σ for each
-    likelihood_σ = vec(obs_data.noise_std) ./ max_signal
+    likelihood_σ = minimum(vec(obs_data.noise_std) ./ max_signal)
 end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
-#likelihood_dist = Normal(0, likelihood_σ)
-likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
+likelihood_dist = Normal(0, likelihood_σ)
+#likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
 xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
 s = 0.005.*exp.(-1/(xs[3]-xs[1]).^2 .*(xs.-xs').^2) # smooth prior
 # prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)] # sparse prior
-prior_dist = [Cauchy(0., 0.01), MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
+prior_dist = [Normal(0,0.008)]#, MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
 
 # add newly calculated information to config
 println("Using likelihood std $(likelihood_σ) for Likelihood distribution.")
