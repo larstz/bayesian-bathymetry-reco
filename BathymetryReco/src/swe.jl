@@ -13,9 +13,13 @@ function simulation(param, solver::PyObject, observation::observation_data)
     # f = Fun(Chebyshev(solver.xbound[1]..solver.xbound[2]), param)
     # solver_bathy = f.(solver.domain.x)
     ######################## Sample bathymetry directly ########################
-    equi_x = range(solver.xbound[1], solver.xbound[2], length(param))
-    sample_bathy = bathymetry(equi_x, param)
-    solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
+    if length(param) > 4
+        equi_x = range(solver.xbound[1], solver.xbound[2], length(param))
+        sample_bathy = bathymetry(equi_x, param)
+        solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
+    else
+        solver_bathy = bathymetry(solver.domain.x, param)
+    end
     #############################################################################
 
     sim_observations, t_sim, _, _ = solver.solve(solver_bathy, sensor_pos=observation.x)
