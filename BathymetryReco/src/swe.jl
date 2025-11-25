@@ -10,17 +10,13 @@ end
 
 function simulation(param, solver::PyObject, observation::observation_data)
     ########################## Using Fun from ApproxFun.jl ########################
-    f = Fun(Chebyshev(solver.xbound[1]..solver.xbound[2]), param)
-    solver_bathy = f.(solver.domain.x)
+    # f = Fun(Chebyshev(solver.xbound[1]..solver.xbound[2]), param)
+    # solver_bathy = f.(solver.domain.x)
     ######################## Sample bathymetry directly ########################
-    # equi_x = range(sim_params.xbounds[1], sim_params.xbounds[2], length(param))
-    # sample_bathy = bathymetry(equi_x, param)
-    # solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
+    equi_x = range(solver.xbound[1], solver.xbound[2], length(param))
+    sample_bathy = bathymetry(equi_x, param)
+    solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
     #############################################################################
-
-    # equi_x = range(solver.xbound[1], solver.xbound[2], length(param))
-    # sample_bathy = bathymetry(equi_x, param)
-    # solver_bathy = PCHIPInterpolation(sample_bathy, equi_x)(solver.domain.x)
 
     sim_observations, t_sim, _, _ = solver.solve(solver_bathy, sensor_pos=observation.x)
     t_sim = vec(collect(0.0:solver.dt:solver.total_t))

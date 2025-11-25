@@ -157,7 +157,7 @@ function read_simulation_parameters(config::Dict{String,Any})
     xbounds = config["xbounds"]
     sensor_pos = config["sensor_position"]
     timestep = config["timestep"]
-    nx = config["nx"]
+    nx = get(config, "nx", 64)
     tstart = config["tstart"]
     tend = config["tinterval"]
     g = config["g"]
@@ -175,7 +175,7 @@ end
 export read_mcmc_parameters
 function read_mcmc_parameters(config::Dict{String,Any})
     n = config["n_samples"]
-    dim = config["nx"]
+    dim = get(config, "nx", 64)
     n_chains = config["n_chains"]
     γ = config["stepsize"]
     burn_in = config["burn_in"]

@@ -59,28 +59,31 @@ forward_model(params) = simulation(params, solver, obs_data)
 
 likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
-    max_signal = [0.0015, 0.003, 0.003]
-    #likelihood_σ = maximum(obs_data.noise_std' ./ max_signal) # replace later by individual σ for each
-    likelihood_σ = minimum(vec(obs_data.noise_std) ./ max_signal)
+    flat_signal = forward_model(zeros(mcmc_config.dim))
+    likelihood_σ = vec(std(obs_data.H .- flat_signal, dims=1)) # set to std of flat signal residuals
+    println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
 end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
-likelihood_dist = Normal(0, likelihood_σ)
-#likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
+#likelihood_dist = Normal(0, likelihood_σ)
+likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
 xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
 s = 0.005.*exp.(-1/(xs[3]-xs[1]).^2 .*(xs.-xs').^2) # smooth prior
 # prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)] # sparse prior
-prior_dist = [Normal(0,0.008)]#, MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
+prior_dist = [MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
+
+# define proposal distribution
+s_prop = exp.(-1/((xs[3]-xs[1])).^2 .*(xs.-xs').^2) # smooth prior
+proposal_dist = MvNormal(zero(xs), PDMat(s_prop))
 
 # add newly calculated information to config
 println("Using likelihood std $(likelihood_σ) for Likelihood distribution.")
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 toml_config["sampler"]["prior"] = "$prior_dist"
-
+toml_config["sampler"]["proposal"] = "$proposal_dist"
 
 pos = Posterior(prior_dist, likelihood_dist)
-model = mcmc_model(pos, forward_model, obs_data)
-
+model = mcmc_model(pos, forward_model, obs_data, proposal_dist)
 init_θ = mcmc_config.initial_θ
 
 if isempty(init_θ)
