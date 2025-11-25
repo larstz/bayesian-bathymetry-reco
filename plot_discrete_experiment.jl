@@ -2,13 +2,14 @@ using Pkg
 Pkg.activate(".")
 using Serialization
 using Plots
+using StatsPlots
 using Statistics
 using BathymetryReco
 using MCMCChains
 
 println("#############################\nRead in chain" )
 
-exp = "data/Heat1.txt_2025-08-14-13-12-25"
+exp = "data/results/waterchannel_exact_bathy_2025-11-24-08-51-24"
 ani = false
 chain = deserialize(joinpath(exp, "chain_1.jls"))
 
@@ -27,7 +28,7 @@ end
 solver = swe_solver(sim_config)
 forward(params) = simulation(params, solver, obs_data)
 
-burnin = 2500
+burnin = 1000
 
 bathy = chain[burnin+1:end,1:mcmc_config.dim]
 lp = chain[burnin+1:end,mcmc_config.dim+1]
@@ -70,3 +71,6 @@ ciplot = plot(xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .-
     ylims=(-0.01,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
 plot!(xs, mean_bathy; label=label="NRMSE = $(round(bathy_nrmse, digits=3))% \n l2 = $(round(bathy_l2, digits=3))% \n linf = $(round(bathy_linf, digits=3))%")
 plot!(ciplot, xs, exact_b; label="Exact bathymetry", color=:black)
+savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).png")
+savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).pdf")
+println("Store at $(exp*"/plots/mean_bathy_credible_interval.png")")
