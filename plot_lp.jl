@@ -6,13 +6,15 @@ using CairoMakie
 using Serialization
 using LaTeXStrings
 
-println(length(ARGS), " arguments provided.")
+#println(length(ARGS), " arguments provided.")
 println("Read in data from disk")
 
 cwd = pwd()
-lp_experiment = ARGS[1]
+#lp_experiment = ARGS[1]
 
-lps = deserialize(joinpath(lp_experiment, "log_posterior_values.jls"))
+lp_experiment = "data/results/lp_scan_Uniform_1.5_12.5-Uniform_0.0_1.0-likelihood_[0.0009590728872906957, 0.001293541617955305, 0.0010467222454721796]_s_234_2025-11-26-10-51-19"
+
+lps = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),1)
 μs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ms.jls"))
 σs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ss.jls"))
 p_grid = hcat([[μ, σ] for μ in μs for σ in σs]...)

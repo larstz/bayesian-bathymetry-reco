@@ -9,7 +9,7 @@ using Distributions
 using Dates
 using PDMats
 
-addprocs(32)
+addprocs(8)
 println("Added $(nworkers()) workers.")
 
 @everywhere begin
@@ -31,8 +31,7 @@ else
     obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
 end
 
-@everywhere
-forward_model(params) = simulation(params, $sim_config, $obs_data)
+@everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
 prior_params = [1.5, 12.5, 0.0, 1.0]
 likelihood_σ = mcmc_config.likelihood_σ
@@ -60,7 +59,7 @@ model = mcmc_model(pos, forward_model, obs_data, Normal(0,1))
 
 @everywhere begin
     μs = LinRange(1.5,12.5,23)
-    σs = LinRange(0.01, 0.1, 10)
+    σs = LinRange(0.01, 0.5, 50)
     p_grid = [[μ, σ] for μ in μs for σ in σs]
 end
 
