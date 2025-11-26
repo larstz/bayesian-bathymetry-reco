@@ -3,12 +3,13 @@ Pkg.activate(".")
 #Pkg.instantiate()
 using Distributed
 
-addprocs(1)
+addprocs(6)
 
 using Dates
 using TOML
 using Serialization
 using Plots
+using PDMats
 
 @everywhere begin
     using Distributions
@@ -59,20 +60,25 @@ end
 
 likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
-    likelihood_σ = maximum(obs_data.noise_std) # replace later by individual σ for each
+    flat_signal = forward_model(zeros(mcmc_config.dim))
+    likelihood_σ = vec(std(obs_data.H .- flat_signal, dims=1)) # set to std of flat signal residuals
+    println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
 end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
-likelihood_dist = Normal(0, likelihood_σ)
-prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)]
+prior_params = [1.5, 12.5, 0.0, 1.0]
+likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
+prior_dist = [Uniform(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
+proposal_dist = MvNormal(zero(xs), PDMat(s_prop))
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 toml_config["sampler"]["prior"] = "$prior_dist"
+toml_config["sampler"]["proposal"] = "$proposal_dist"
 
 
 pos = Posterior(prior_dist, likelihood_dist)
-model = mcmc_model(pos, forward_model, obs_data)
+model = mcmc_model(pos, forward_model, obs_data, proposal_dist)
 
 init_θ = mcmc_config.initial_θ
 
@@ -111,16 +117,22 @@ if store_exp
     pc = plot(;title="Chains", xlabel="Iteration", ylabel="Value", legend=:outerright)
     plp = plot(;title="Chain log p(θ)", xlabel="Iteration", ylabel="Value", legend=:outerright)
     pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    pll = plot(;title="Chain log likelihood", xlabel="Iteration", ylabel="Value", legend=:outerright)
+    plprior = plot(;title="Chain log prior", xlabel="Iteration", ylabel="Value", legend=:outerright)
     # Serialize the chain
     for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chain[i])
 
         # Plot the chain
-        plot!(pc,chain[i][:,1:end-2]; label=["μ_$i" "σ²_$i"]) # sampled parameters
-        plot!(plp, chain[i][:,end-1]; label="$i: log p(θ)") # log p of sample
-        plot!(pla, chain[i][:,end]; label="$i: α") # log p of sample
+        plot!(pc,chains[i][:,1:end-4]; label="") # sampled parameters
+        plot!(plp, chains[i][:,end-3]; label="$i: log p(θ)") # log p
+        plot!(pll, chains[i][:,end-2]; label="$i: log likelihood") # log likelihood
+        plot!(plprior, chains[i][:,end-1]; label="$i: log prior") # log prior
+        plot!(pla, chains[i][:,end]; label="$i: α") # acceptance rate
     end
     savefig(pc, "./plots/chain.png")
     savefig(plp, "./plots/logp.png")
+    savefig(pll, "./plots/loglikelihood.png")
+    savefig(plprior, "./plots/logprior.png")
     savefig(pla, "./plots/acceptance_rate.png")
 end
