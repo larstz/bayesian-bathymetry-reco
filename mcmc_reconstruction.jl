@@ -69,7 +69,7 @@ println("Using $(likelihood_σ) std for Likelihood distribution.")
 prior_params = [1.5, 12.5, 0.0, 1.0]
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
 prior_dist = [Uniform(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
-proposal_dist = MvNormal(zero(xs), PDMat(s_prop))
+proposal_dist = Normal(0,1)
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
@@ -124,11 +124,11 @@ if store_exp
         serialize("chain_$i.jls", chain[i])
 
         # Plot the chain
-        plot!(pc,chains[i][:,1:end-4]; label="") # sampled parameters
-        plot!(plp, chains[i][:,end-3]; label="$i: log p(θ)") # log p
-        plot!(pll, chains[i][:,end-2]; label="$i: log likelihood") # log likelihood
-        plot!(plprior, chains[i][:,end-1]; label="$i: log prior") # log prior
-        plot!(pla, chains[i][:,end]; label="$i: α") # acceptance rate
+        plot!(pc,chain[i][:,1:end-4]; label="") # sampled parameters
+        plot!(plp, chain[i][:,end-3]; label="$i: log p(θ)") # log p
+        plot!(pll, chain[i][:,end-2]; label="$i: log likelihood") # log likelihood
+        plot!(plprior, chain[i][:,end-1]; label="$i: log prior") # log prior
+        plot!(pla, chain[i][:,end]; label="$i: α") # acceptance rate
     end
     savefig(pc, "./plots/chain.png")
     savefig(plp, "./plots/logp.png")
