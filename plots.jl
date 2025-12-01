@@ -3,13 +3,13 @@ Pkg.activate(".")
 
 using BathymetryReco
 using Plots
-using DataFrames
 using Statistics
 using Serialization
 using Dates
 using LaTeXStrings
 using Measures
 using Printf
+using MCMCChains
 
 width_cm = 18/4
 height_cm = 9/4
@@ -33,7 +33,7 @@ mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
 io_config = config.io_settings
 
-plot_chains = false
+plot_chains = true
 plot_bathys = true
 
 # Load the data
@@ -62,23 +62,9 @@ sample_mean = mean.(samples, dims=1)
 samples_mat = hcat(samples...)
 
 stored_vals = Int64(size(samples_mat, 2)/n_chains)
-param_names = ["\\mu", "\\sigma^2", "lp", "ar"]
+param_names = ["\\mu", "\\sigma^2", "lpost", "ll", "lprior","ar"]
 
 plot_size = (960,400)
-
-function chains2df(chains)
-    # Convert the chains to a DataFrame
-    df = DataFrame()
-    i = 1
-    for chain in chains
-        n_params = size(chain, 2) - 1
-        nms = vcat([Symbol("param_$(j)_c_$(i)") for j in 1:n_params]..., Symbol("lp_c_$(i)"))
-        chain_df = DataFrame(chain, nms)
-        df = hcat(df, chain_df)# leftjoin!(df, chain_df)
-        i += 1
-    end
-    return df
-end
 
 # everything should be loaded now create the plots
 plot_path = joinpath(experiment, "plots")
@@ -112,10 +98,10 @@ if plot_bathys
         burnin_chain = chain[burn_in+1:end, :]
         bathys = zeros(size(burnin_chain)[1], length(exact_b))
         for (i, sample) in enumerate(eachrow(burnin_chain))
-            bathys[i, :] = bathymetry(x, sample[1:end-2])
+            bathys[i, :] = bathymetry(x, sample[1:end-4])
         end
         #bathy_mean = vec(mean(bathys, dims=1))
-        mean_params = vec(mean(burnin_chain[:, 1:end-2], dims=1))
+        mean_params = vec(mean(burnin_chain[:, 1:end-4], dims=1))
         #rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
         rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2))*100, digits=2)
         #nrmse = sqrt(mean(bathymetry(x, mean_params) .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b))
