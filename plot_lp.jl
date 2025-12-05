@@ -5,16 +5,21 @@ Pkg.instantiate()
 using CairoMakie
 using Serialization
 using LaTeXStrings
+using Distributions
+
+function get_prior(prior, points)
+    return sum(logpdf.(prior, points), dims=1)
+end
 
 #println(length(ARGS), " arguments provided.")
 println("Read in data from disk")
 
 cwd = pwd()
-#lp_experiment = ARGS[1]
-
-lp_experiment = "data/results/lp_scan_Uniform_1.5_12.5-Uniform_0.0_1.0-likelihood_[0.0009590728872906957, 0.001293541617955305, 0.0010467222454721796]_s_234_2025-11-26-10-51-19"
+lp_experiment = ARGS[1]
 
 lps = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),1)
+lls = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),2)
+prs = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),3)
 μs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ms.jls"))
 σs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ss.jls"))
 p_grid = hcat([[μ, σ] for μ in μs for σ in σs]...)
@@ -24,6 +29,12 @@ line_colors = [RGBf(0.1216, 0.4667, 0.7059), RGBf(1.0, 0.498, 0.0549), RGBf(0.17
 lp_mat = permutedims(reshape(lps, length(σs), length(μs)))
 #replace -Inf with NaN
 lp_mat[lp_mat .== -Inf] .= NaN
+ll_mat = permutedims(reshape(lls, length(σs), length(μs)))
+pr_mat = permutedims(reshape(prs, length(σs), length(μs)))
+
+test_prior = [Normal(4.0, 1.0), Uniform(0.0, 1.0)]
+prior_vals = get_prior(test_prior, p_grid)
+pr_mat_test = permutedims(reshape(prior_vals, length(σs), length(μs)))
 
 width_cm = 30
 height_cm = 19.5
@@ -33,15 +44,34 @@ end
 
 println("Plotting log-posterior")
 f = Figure(size=cm2px((width_cm, height_cm)), fontsize=30)
-ax = Axis(f[1, 1]; title=latexstring("\\pi_L(H|b)\\pi_\\mathrm{Prior}(b)"), xlabel=latexstring("\\mu"), ylabel=latexstring("\\sigma^2"), xticks=1.5:1.:15.0, yticks=0.0:0.05:0.5, titlesize=32)
+ax = Axis(f[1, 1]; title=latexstring("\\log\\pi_L(H|b)+\\log\\pi_\\mathrm{Prior}(b)"), xlabel=latexstring("\\mu"), ylabel=latexstring("\\sigma^2"), xticks=1.5:1.:15.0, yticks=0.0:0.05:0.5, titlesize=32)
 cont = contourf!(ax,μs, σs, lp_mat; nan_color=:white, levels=50)
 contour!(ax, μs, σs, lp_mat; nan_color=:white,levels=49, linewidth=0.25, color=:white)
 Colorbar(f[1, 2], cont)
+
+println("Plotting log-likelihood")
+fll = Figure(size=cm2px((width_cm, height_cm)), fontsize=30)
+axll = Axis(fll[1, 1]; title=latexstring("\\log\\pi_L(H|b)"), xlabel=latexstring("\\mu"), ylabel=latexstring("\\sigma^2"), xticks=1.5:1.:15.0, yticks=0.0:0.05:0.5, titlesize=32)
+contll = contourf!(axll,μs, σs, ll_mat; nan_color=:white, levels=50)
+contour!(axll, μs, σs, ll_mat; nan_color=:white,levels=49, linewidth=0.25, color=:white)
+Colorbar(fll[1, 2], contll)
+
+fpr = Figure(size=cm2px((width_cm, height_cm)), fontsize=30)
+axpr = Axis(fpr[1, 1]; title=latexstring("\\log\\pi_L(H|b)+\\log\\pi_\\mathrm{Prior}(b)"), xlabel=latexstring("\\mu"), ylabel=latexstring("\\sigma^2"), xticks=1.5:1.:15.0, yticks=0.0:0.05:0.5, titlesize=32)
+contpr = contourf!(axpr,μs, σs, pr_mat_test.+ll_mat; nan_color=:white, levels=50)
+contour!(axpr, μs, σs, pr_mat_test.+ll_mat; nan_color=:white,levels=49, linewidth=0.25, color=:white)
+Colorbar(fpr[1, 2], contpr)
 
 cd(lp_experiment)
 
 save("log_posterior.png", f)
 save("log_posterior.pdf", f)
+
+save("log_likelihood.png", fll)
+save("log_likelihood.pdf", fll)
+
+save("log_prior_N401_N005001_plus_likelihood.png", fpr)
+save("log_prior_N401_N005001_plus_likelihood.pdf", fpr)
 cd(cwd)
 if length(ARGS) == 2
     chain_experiment = ARGS[2]
@@ -54,8 +84,8 @@ if length(ARGS) == 2
     for (i,chain) in enumerate(samples)
         μ = chain[:, 1]
         σ = chain[:, 2]
-        scatter!(ax, μ[1], σ[1], color=line_colors[i], markersize=12)
-        lines!(ax, μ, σ, label="Chain $(i)", color=line_colors[i], linewidth=3)
+        scatter!(axpr, μ[1], σ[1], color=line_colors[i], markersize=12)
+        lines!(axpr, μ, σ, label="Chain $(i)", color=line_colors[i], linewidth=3)
     end
 
     println("Plotting max posterior")
@@ -63,11 +93,11 @@ if length(ARGS) == 2
     println("Max Posterior: ", idmax)
     max_p = p_grid[:, idmax]
     println("Max Posterior: ", max_p)
-    scatter!(ax, max_p[1], max_p[2], color=:black, label="Max Posterior", markersize=12)
-    axislegend(ax)
+    scatter!(axpr, max_p[1], max_p[2], color=:black, label="Max Posterior", markersize=12)
+    axislegend(axpr)
 
     cd(chain_experiment)
 
-    save("log_posterior_with_chains.png", f, px_per_unit=300/96)
-    save("log_posterior_with_chains.pdf", f, px_per_unit=300/96)
+    save("log_posterior_with_chains.png", fpr, px_per_unit=300/96)
+    save("log_posterior_with_chains.pdf", fpr, px_per_unit=300/96)
 end

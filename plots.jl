@@ -11,8 +11,8 @@ using Measures
 using Printf
 using MCMCChains
 
-width_cm = 18/4
-height_cm = 9/4
+width_cm = 18/3
+height_cm = 9/3
 function cm2px(size)
     dpi = 300
     return (size[1] * dpi / 2.54, size[2] * dpi / 2.54)
@@ -24,7 +24,7 @@ ticks1dec(x) = @sprintf("%.1f", x)
 #default(size=(0.25*0.75*600, 0.25*400))
 date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
-experiment = ARGS[1]
+experiment = "data/waterchannel_exact_bathy_2025-12-01-16-44-01"
 exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
 println("Creating plots for experiment: ", experiment)
 config = load_config(joinpath(experiment, "experiment_config.toml"))
@@ -51,7 +51,7 @@ files = readdir(experiment)
 chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
 n_chains = length(chains)
 samples = [deserialize(joinpath(experiment, file)) for file in chains]
-burn_in = 250
+burn_in = 0
 
 # sampled 2σ² instead of σ², so we need to convert it, adjusted after 2025-06-25
 if exp_date < Date(2025,6,25)
@@ -63,8 +63,11 @@ samples_mat = hcat(samples...)
 
 stored_vals = Int64(size(samples_mat, 2)/n_chains)
 param_names = ["\\mu", "\\sigma^2", "lpost", "ll", "lprior","ar"]
+chain_param = [:mu, :sigma2, :lpost, :ll, :lprior, :ar]
+chain_internals = [:lpost, :ll, :lprior, :ar]
+chain_array = reshape(samples_mat[250+1:end, :], (:, stored_vals, n_chains))
 
-plot_size = (960,400)
+mcmc_chains = Chains(chain_array, chain_param, Dict(:internals => chain_internals))
 
 # everything should be loaded now create the plots
 plot_path = joinpath(experiment, "plots")
@@ -100,11 +103,10 @@ if plot_bathys
         for (i, sample) in enumerate(eachrow(burnin_chain))
             bathys[i, :] = bathymetry(x, sample[1:end-4])
         end
-        #bathy_mean = vec(mean(bathys, dims=1))
+        bathy_mean = vec(mean(bathys, dims=1))
         mean_params = vec(mean(burnin_chain[:, 1:end-4], dims=1))
-        #rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
         rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2))*100, digits=2)
-        #nrmse = sqrt(mean(bathymetry(x, mean_params) .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b))
+
         pb = plot(x, exact_b; c=:black, xlabel="x [m]", ylabel="b(x) [m]", label="Exact bathymetry", xlim=(1.5,12))
         plot!(pb, x, bathys'; label=permutedims(vcat([latexstring("b(x; \\mu_i, \\sigma^2_i),\\ i \\in [n]")], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
         #plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
@@ -112,8 +114,23 @@ if plot_bathys
         yaxis!(pb, yticks=0.0:0.05:0.5)
         xaxis!(pb, xticks=2:2:12)
         # to display error use bars from quantiles
-        savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx).png"))
-        savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx).pdf"))
+
+        savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx)_bi_$(burn_in).png"))
+        savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx)_bi_$(burn_in).pdf"))
+
+        mcmc_bathy = Chains(bathys)
+        ci_low = hpd(mcmc_bathy)[:, :lower]
+        ci_high = hpd(mcmc_bathy)[:, :upper]
+        bathy_l2 = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
+        bathy_linf = maximum(abs.(bathy_mean .- exact_b))/maximum(exact_b)*100
+        bathy_nrmse = (sqrt(mean(bathy_mean .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b)))*100
+
+        ciplot = plot(x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean), label="95% Credible Interval",
+        ylims=(-0.01,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
+        plot!(x, bathy_mean; label="sample mean\n"*latexstring("\\varepsilon_\\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3)) \\% \\ \\varepsilon_\\mathrm{L2} = $(round(bathy_l2, digits=3))\\% \\ \\varepsilon_\\mathrm{L\\infty} = $(round(bathy_linf, digits=3)) \\%"))
+        plot!(ciplot, x, exact_b; label="Exact bathymetry", color=:black)
+        savefig(ciplot, joinpath(plot_path, "pngs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).png"))
+        savefig(ciplot, joinpath(plot_path, "pdfs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).pdf"))
 
         # Plot the sensor simulation
         sim_chain = simulation(mean_params, sim_config, obs_data)

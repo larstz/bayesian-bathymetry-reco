@@ -6,10 +6,11 @@ using StatsPlots
 using Statistics
 using BathymetryReco
 using MCMCChains
+using LaTeXStrings
 
 println("#############################\nRead in chain" )
 
-exp = "data/results/waterchannel_exact_bathy_2025-11-24-08-51-24"
+exp = ARGS[1]
 ani = false
 chain = deserialize(joinpath(exp, "chain_1.jls"))
 
@@ -68,9 +69,20 @@ savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).pdf")
 println("Store at $(exp*"/plots/mean_bathy_errorbars.png")")
 
 ciplot = plot(xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .- mean_bathy), label="95% Credible Interval",
-    ylims=(-0.01,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
+    ylims=(-0.05,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
 plot!(xs, mean_bathy; label=label="NRMSE = $(round(bathy_nrmse, digits=3))% \n l2 = $(round(bathy_l2, digits=3))% \n linf = $(round(bathy_linf, digits=3))%")
 plot!(ciplot, xs, exact_b; label="Exact bathymetry", color=:black)
 savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).png")
 savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).pdf")
 println("Store at $(exp*"/plots/mean_bathy_credible_interval.png")")
+
+sim_chain = forward(mean_bathy)
+
+println("#############################\nCreate sensor simulation plots" )
+rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4).*100
+for i in 2:4
+    psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])%", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
+    plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
+    savefig(psim, joinpath(exp, "sim_chain_sensor_$(i).png"))
+    savefig(psim, joinpath(exp, "sim_chain_sensor_$(i).pdf"))
+end
