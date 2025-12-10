@@ -69,8 +69,8 @@ println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
 xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
 s = 0.005.*exp.(-1/(xs[3]-xs[1]).^2 .*(xs.-xs').^2) # smooth prior
-# prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)] # sparse prior
-prior_dist = [MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
+#prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)] # sparse prior
+prior_dist = [Cauchy(0.,0.01), MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
 
 # define proposal distribution
 s_prop = exp.(-1/((xs[3]-xs[1])).^2 .*(xs.-xs').^2) # smooth prior

@@ -10,6 +10,7 @@ using TOML
 using Serialization
 using Plots
 using PDMats
+using LinearAlgebra
 
 @everywhere begin
     using Distributions
@@ -66,10 +67,10 @@ if likelihood_σ == 0.0
 end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
-prior_params = [4.0, 0.1, 0.05, 0.01]
+prior_params = [4.0, 1.0, 0.001, 1.0]
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
-prior_dist = [Normal(prior_params[1:2]...), Normal(prior_params[3:4]...)]
-proposal_dist = Normal(0,1)
+prior_dist = [Normal(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
+proposal_dist = MvNormal(zeros(mcmc_config.dim),I)
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
