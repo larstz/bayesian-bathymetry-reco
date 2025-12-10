@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
+import matplotlib.pyplot as plt
 
 
 class leftbc(object):
@@ -9,7 +10,7 @@ class leftbc(object):
         time    = 0
         with open(filename, 'r') as f:
             for line in f.readlines()[1:]:
-                fields = line.split()
+                fields = line.split(",")
                 self.heights.append(float(fields[0])/100) # convert from cm to m
                 time += 0.01 # sampling rate in seconds
         nt =  np.shape(self.heights)[0]
@@ -28,7 +29,7 @@ class data(object):
         time    = 0
         with open(filename, 'r') as f:
             for line in f.readlines()[1:]:
-                fields = line.split()
+                fields = line.split(",")
                 heights1.append(float(fields[1])/100) # convert from cm to m
                 heights2.append(float(fields[2])/100) # convert from cm to m
                 heights3.append(float(fields[3])/100) # convert from cm to m
