@@ -59,7 +59,7 @@ function load_observation(file_path::String, noise_var::Float64=0.0; sensor_id::
     end
 end
 
-function load_observation(file_path::String, t_start::Float64, t_interval::Float64, sensor_id::Array{Int64}=[2, 3, 4])
+function load_observation(file_path::String, t_start::Float64, t_interval::Float64; sensor_id::Array{Int64}=[2, 3, 4])
     measurement = CSV.read(file_path, DataFrame)
     id2pos = [3.5, 5.5, 7.5]
     sensor_id = sensor_id .- 1 # convert to 1-based indexing
@@ -190,13 +190,8 @@ function read_observation_settings(config::Dict{String,Any})
     path = config["path"]
     real_data = config["real_data"]
     noise_var = config["noise_var"]
-    if real_data
-        sensor_id = [2, 3, 4]
-        sensor_rate = 0.01
-    else
-        sensor_id = config["sensor_id"]
-        sensor_rate = config["sensor_rate"]
-    end
+    sensor_id = config["sensor_id"]
+    sensor_rate = config["sensor_rate"]
     obs_settings = observation_settings(path, real_data, noise_var, sensor_rate, sensor_id)
     return obs_settings
 end

@@ -67,9 +67,9 @@ if likelihood_σ == 0.0
 end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
-prior_params = [4.0, 1.0, 0.001, 1.0]
+prior_params = [1.5, 12.0, 0.0, 1.0]
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
-prior_dist = [Normal(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
+prior_dist = [Uniform(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
 proposal_dist = MvNormal(zeros(mcmc_config.dim),I)
 
 # add newly calculated information to config

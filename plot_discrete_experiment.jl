@@ -83,6 +83,6 @@ rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sq
 for i in 2:4
     psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])%", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
     plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
-    savefig(psim, joinpath(exp, "sim_chain_sensor_$(i).png"))
-    savefig(psim, joinpath(exp, "sim_chain_sensor_$(i).pdf"))
+    savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).png"))
+    savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).pdf"))
 end

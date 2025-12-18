@@ -32,15 +32,17 @@ io_config = config.io_settings
 
 # Load the data
 if obs_config.real_data
-    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
+    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval,
+    sensor_id  = obs_config.sensor_id)
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var,
+    sensor_rate=obs_config.sensor_rate, sensor_id=obs_config.sensor_id)
 end
 
 # create plot of the observation signal
 ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface height [m]")
 plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
-exp_name = splitpath(obs_config.path)[end]
+exp_name = split(splitpath(obs_config.path)[end], ".")[1]
 
 store_exp = io_config.save
 target_dir = joinpath(io_config.output_dir,
@@ -70,7 +72,7 @@ likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2
 xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
 s = 0.005.*exp.(-1/(xs[3]-xs[1]).^2 .*(xs.-xs').^2) # smooth prior
 #prior_dist = [Cauchy(0., 0.01) for i in 1:length(sim_config.nx)] # sparse prior
-prior_dist = [Cauchy(0.,0.01), MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
+prior_dist = [Cauchy(0.,0.01)]#, MvNormal(zeros(mcmc_config.dim), PDMat(s))] # sqexp prior
 
 # define proposal distribution
 s_prop = exp.(-1/((xs[3]-xs[1])).^2 .*(xs.-xs').^2) # smooth prior
