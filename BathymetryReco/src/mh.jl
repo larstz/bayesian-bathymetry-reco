@@ -23,12 +23,61 @@ function loglikelihood(p::Posterior, θ, obs)
     return -length(θ)*0.5 * log(2π) -length(θ)*log(p.likelihood.σ) - 1/ (2 * p.likelihood.σ^2)* sum((θ - obs).^2 )
 end
 
+export Proposal, RandomWalkProposal, pCNProposal, proposal
+abstract type Proposal end
+
+struct RandomWalkProposal<:Proposal
+    γ::Union{Float64, Array{Float64,1}}
+    C::PDMat
+end
+
+# Constructor for when you only have gamma and dimension
+RandomWalkProposal(γ::Union{Float64, Array{Float64,1}}, dim::Int) = RandomWalkProposal(γ, PDMat(Matrix(I, dim, dim)))
+struct pCNProposal<:Proposal
+    β::Float64
+    C::PDMat
+end
+
+function proposal(θ, proposal::RandomWalkProposal)
+    return rand(MvNormal(θ, proposal.γ.^2 .* proposal.C))
+end
+
+function proposal(θ, proposal::pCNProposal)
+    return rand(MvNormal(√(1-proposal.β^2) .* θ,proposal.β^2 .*proposal.C))
+end
+
+function proposal(θ, proposal::Distribution)
+    return θ .+ rand(proposal)
+end
+
+export SqExpMvNormal
+struct SqExpMvNormal
+    dim::Int
+    lengthscale::Int64 # number of grid points
+    variance::Float64
+end
+
+function Base.show(io::IO, sp::SqExpMvNormal)
+    print(io, typeof(sp), "(")
+    print(io, "dim: ", sp.dim, ", ")
+    print(io, "lengthscale: ", sp.lengthscale, ", ")
+    print(io, "variance: ", sp.variance)
+    print(io, ")")
+end
+
+# Convert to MvNormal
+function Distributions.MvNormal(p::SqExpMvNormal)
+    xs = LinRange(1, p.dim, p.dim)
+    C = p.variance .* exp.(-((xs .- xs').^2) / (2*p.lengthscale^2))
+    return MvNormal(zeros(p.dim), PDMat(Matrix(C)))
+end
+
 export mcmc_model
 struct mcmc_model
     posterior::Posterior
     forward::Function
     observation::observation_data
-    proposal::Distribution
+    proposal::Union{Distribution, Proposal}
 end
 
 export logjoint
@@ -61,14 +110,9 @@ function sample_chain(model::mcmc_model, n, initial_θ; verbose=false, logging=P
     chain[1, :] = [θ..., lpost, ll, lp, 1.0]
     acceptance_rate = 1.0
     accepted = 1
-    #β = 0.1
     for i in 1:n
 
-        #temp_proposal = γ .* rand(Normal(0,1), size(θ))
-        #θ_new = √(1-β^2) .* θ + β .* temp_proposal #γ .* rand(Normal(0,1), size(θ))
-        # pCN, β∈[0,1]
-        # θ_new = rand(MvNormal(√(1-β^2) .* θ, PDiagMat(β^2 .* ones(length(θ)))))
-        θ_new = θ + γ .* rand(model.proposal)
+        θ_new = proposal(θ, model.proposal)
         lpost_new, ll_new, lp_new = logjoint(model, θ_new)
 
         if (rand()) < exp(lpost_new - lpost)
@@ -96,21 +140,3 @@ end
 function sample_chain(model::mcmc_model, setup::mcmc_setup, initial_θ; kargs...)
     return sample_chain(model, setup.n, initial_θ;γ=setup.γ, burn_in=setup.burn_in, kargs...)
 end
-
-# function propose_new(θ, γ, proposal)
-#     return proposal(θ, γ)
-# end
-
-# struct RandomWalkProposal
-
-
-# end
-# struct pCNProposal end
-
-# function rmwh_proposal(θ, γ)
-#     return θ + γ .* rand(MvNormal(zero(θ),PDiagMat(ones(length(θ)))))
-# end
-
-# function pCN(θ, β)
-#     return rand(MvNormal(√(1-β^2) .* θ, PDiagMat(β^2 .* ones(length(θ)))))
-# end

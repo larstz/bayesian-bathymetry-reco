@@ -94,6 +94,23 @@ struct simulation_setup
     bathy_name::String
 end
 
+export prior_settings
+struct prior_settings
+    type:: Array{String,1}
+    lengthscale::Float64
+    var::Float64
+    loc::Float64
+    scale::Float64
+end
+
+export proposal_settings
+struct proposal_settings
+    type::String
+    kernel::String
+    lengthscale::Float64
+    var::Float64
+end
+
 export mcmc_setup
 struct mcmc_setup
     n::Int
@@ -102,6 +119,8 @@ struct mcmc_setup
     γ::Union{Float64, Array{Float64, 1}}
     burn_in::Int
     likelihood_σ::Union{Float64, Array{Float64, 1}}
+    prior::Union{prior_settings, Nothing}
+    proposal::Union{proposal_settings, Nothing}
     initial_θ::Union{Array{Float64, 1}, Array{Array{Float64, 1}, 1}, Array{Union{}, 1}}
 end
 
@@ -181,8 +200,35 @@ function read_mcmc_parameters(config::Dict{String,Any})
     burn_in = config["burn_in"]
     likelihood_σ = config["likelihood_var"]
     init = config["initial"]
-    mcmc_params = mcmc_setup(n, dim, n_chains, γ, burn_in, likelihood_σ,init)
+    prior_settings = read_prior_settings(get(config, "prior", nothing))
+    proposal_settings = read_proposal_settings(get(config, "proposal", nothing))
+    mcmc_params = mcmc_setup(n, dim, n_chains, γ, burn_in, likelihood_σ, prior_settings, proposal_settings, init)
     return mcmc_params
+end
+
+export read_prior_settings
+function read_prior_settings(config::Union{Dict{String,Any}, Nothing})
+    if config === nothing
+        return nothing
+    end
+    type = config["type"] isa String ? [config["type"]] : config["type"]
+    lengthscale = get(config, "lengthscale", 0.0)
+    var = get(config, "var", 0.0)
+    loc = get(config, "loc", 0.0)
+    scale = get(config, "scale", 1.0)
+    return prior_settings(type, lengthscale, var, loc, scale)
+end
+
+export read_proposal_settings
+function read_proposal_settings(config::Union{Dict{String,Any}, Nothing})
+    if config === nothing
+        return nothing
+    end
+    type = config["type"]
+    kernel = get(config, "kernel", "")
+    lengthscale = get(config, "lengthscale", 0.0)
+    var = get(config, "var", 0.0)
+    return proposal_settings(type, kernel, lengthscale, var)
 end
 
 export read_observation_settings
