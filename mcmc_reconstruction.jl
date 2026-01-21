@@ -22,7 +22,7 @@ ENV["GKSwstype"]="nul"
 # Load the configuration
 println("#############################\nRead in config file" )
 if isempty(ARGS)
-    config_file = abspath("config.toml")
+    config_file = abspath("./width_test_configs/config_1.toml")
 else
     config_file = abspath(ARGS[1])
 end
@@ -70,7 +70,7 @@ println("Using $(likelihood_σ) std for Likelihood distribution.")
 prior_params = [1.5, 12.0, 0.0, 1.0]
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
 prior_dist = [Uniform(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
-proposal_dist = MvNormal(zeros(mcmc_config.dim),I)
+proposal_dist = MvNormal(zeros(mcmc_config.dim),mcmc_config.γ.^2 .* PDiagMat(ones(mcmc_config.dim)))
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
@@ -87,7 +87,7 @@ if isempty(init_θ)
     xg = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=sim_config.nx))
     #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
-    init_θ = [zeros(mcmc_config.nx)]#[bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
+    init_θ = [zeros(mcmc_config.dim)]#[bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
     toml_config["sampler"]["init"] = init_θ
     inip = plot(xg, init_θ[1])
     savefig(inip, joinpath(plot_path, "initial_parameters.png"))
