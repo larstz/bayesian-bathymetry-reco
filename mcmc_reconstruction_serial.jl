@@ -18,7 +18,7 @@ ENV["GKSwstype"]="nul"
 # Load the configuration
 println("#############################\nRead in config file" )
 if isempty(ARGS)
-    config_file = abspath("./configs/config.toml")
+    config_file = abspath("./configs/configtest.toml")
 else
     config_file = abspath(ARGS[1])
 end
@@ -66,7 +66,7 @@ println("#############################")
 
 # create plot of the observation signal
 ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface height [m]")
-plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in 2:4], 1,3))
+plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in obs_config.sensor_id], 1,length(obs_config.sensor_id)))
 
 
 # define forward model
