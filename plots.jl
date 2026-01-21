@@ -24,7 +24,7 @@ ticks1dec(x) = @sprintf("%.1f", x)
 #default(size=(0.25*0.75*600, 0.25*400))
 date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
-experiment = "data/waterchannel_exact_bathy_2025-12-01-16-44-01"
+experiment = AGRS[1]
 exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
 println("Creating plots for experiment: ", experiment)
 config = load_config(joinpath(experiment, "experiment_config.toml"))
