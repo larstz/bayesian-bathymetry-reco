@@ -219,6 +219,9 @@ function read_prior_settings(config::Union{Dict{String,Any}, Nothing})
     return prior_settings(type, lengthscale, var, loc, scale)
 end
 
+read_prior_settings(config::String) = nothing
+read_proposal_settings(config::String) = nothing
+
 export read_proposal_settings
 function read_proposal_settings(config::Union{Dict{String,Any}, Nothing})
     if config === nothing
