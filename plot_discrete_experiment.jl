@@ -7,6 +7,8 @@ using Statistics
 using BathymetryReco
 using MCMCChains
 using LaTeXStrings
+using CSV
+using DataFrames
 
 println("#############################\nRead in chain" )
 
@@ -59,6 +61,9 @@ grid_error = mcse(mcmc_chain)[:, :mcse]
 grid_ci_low = hpd(mcmc_chain)[:, :lower]
 grid_ci_high = hpd(mcmc_chain)[:, :upper]
 
+result_df = DataFrame(x=xs, mean_bathy=mean_bathy, ci_low=grid_ci_low, ci_high=grid_ci_high, mcse=grid_error)
+CSV.write(joinpath(exp, "bathy_statistics_$(burnin).csv"), result_df)
+
 error_plot = scatter(xs, mean_bathy, yerror=grid_error, label="Mean of last $(size(bathy)[1]-burnin) samples", markersize=2,
      ylims=(-0.055,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean: NRMSE = $(round(bathy_nrmse, digits=3))%")
 plot!(error_plot, xs, mean_bathy; label="NRMSE = $(round(bathy_nrmse, digits=3))% \n l2 = $(round(bathy_l2, digits=3))% \n linf = $(round(bathy_linf, digits=3))%")
@@ -86,3 +91,10 @@ for i in 2:4
     savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).png"))
     savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).pdf"))
 end
+
+metrics_dict = Dict("NRMSE" => bathy_nrmse,
+                    "rL2" => bathy_l2,
+                    "rLinf" => bathy_linf)
+metrics_df = DataFrame(metrics_dict)
+metrics_file = joinpath(exp, "metrics.csv")
+CSV.write(metrics_file, metrics_df)
