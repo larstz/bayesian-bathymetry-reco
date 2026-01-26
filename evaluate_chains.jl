@@ -30,11 +30,20 @@ n_targets = length(targets_vec)
 n_chains = round(Int64, length(chains)/n_targets)
 
 samples = deserialize.(chains)
+
+# adapt to new format also storing loglikelihood and logprior
+for (i, sample) in enumerate(samples)
+    if size(sample,2) >= 6
+        samples[i] = sample[:, [1,2,4,end]] # keep only mu, s2, logp, ar
+    end
+end
+
 chain_tensor = reshape(hcat(samples...), size(samples[1])[1], size(samples[1])[2], n_chains, n_targets)
+chain_tensor = chain_tensor[:, 1:4, :, :]
 burn_in = 300
 burned_tensor = chain_tensor[burn_in:end, :, :, :]
-param_names = ["mu", "s2", "ll", "lp", "lprior", "ar"]
-mean_lp = mean(burned_tensor[:, 4, :, :], dims=1)
+param_names = ["mu", "s2", "lp", "ar"]
+mean_lp = mean(burned_tensor[:, 3, :, :], dims=1)
 d_lp = maximum(mean_lp, dims=2) .- mean_lp
 
 exp_id = [reshape(d_lp[:,:,i].<10, 7) for i in 1:n_targets]
@@ -43,13 +52,17 @@ mu_means = zeros(n_targets)
 s2_means = zeros(n_targets)
 mu_error = zeros(n_targets)
 s2_error = zeros(n_targets)
+ci_low = zeros(n_targets, 2)
+ci_high = zeros(n_targets, 2)
 for (i, id) in enumerate(exp_id)
     mu_means[i] = mean(chain_tensor[:, 1, id, i])
     s2_means[i] = mean(chain_tensor[:, 2, id, i])
-    temp_chain = Chains(chain_tensor[:, :, id, i], param_names, Dict(:internal => [:lp, :ll, :lprior, :ar]))
+    temp_chain = Chains(chain_tensor[:, :, id, i], param_names, Dict(:internal => [:lp, :ar]))
     error = mcse(temp_chain)
     mu_error[i] = error[:mu,:mcse]
     s2_error[i] = error[:s2,:mcse]
+    ci_low[i, :] = hpd(temp_chain)[:, :lower]
+    ci_high[i,:] = hpd(temp_chain)[:, :upper]
 end
 
 if occursin("width_test", experiment)
@@ -64,9 +77,11 @@ else
     s2target = "Target=0.05"
 end
 
-pm = scatter(target, mu_means, yerror=mu_error, label="Mean of mu", xlabel=xlabel, title="Mean of mu across plausible chains")
+pm = scatter(target, mu_means, yerror=(mu_means.-ci_low[:,1], ci_high[:,1].-mu_means),
+label="Mean of mu", xlabel=xlabel, title="Mean of mu across plausible chains")
 plot!(pm, target, mu_targets, label=mutarget, linestyle=:dash, color=:red)
-ps = scatter(target, s2_means, yerror=s2_error, label="Mean of s2", xlabel=xlabel, title="Mean of s2 across plausible chains")
+ps = scatter(target, s2_means, yerror=(s2_means.-ci_low[:,2], ci_high[:,2].-s2_means),
+ label="Mean of s2", xlabel=xlabel, title="Mean of s2 across plausible chains")
 plot!(ps, target, s2_targets, label=s2target, linestyle=:dash, color=:red)
-savefig(pm, joinpath(experiment, "mu_means.png"))
-savefig(ps, joinpath(experiment, "s2_means.png"))
+savefig(pm, joinpath(experiment, "mu_means_ci.png"))
+savefig(ps, joinpath(experiment, "s2_means_ci.png"))
