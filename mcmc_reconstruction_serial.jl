@@ -91,18 +91,21 @@ for prior_type in lowercase.(prior_settings.type)
         smooth_kernel = SqExpMvNormal(mcmc_config.dim, prior_settings.lengthscale, prior_settings.var)
         push!(prior_dist, MvNormal(smooth_kernel))
     elseif prior_type == "sparse"
-        push!(prior_dist, Cauchy(mcmc_config.prior_loc, mcmc_config.prior_scale))
+        push!(prior_dist, Cauchy(prior_settings.loc, prior_settings.scale))
     end
 end
 println("Using prior distribution: $(prior_settings.type)")
+
 # define proposal distribution
-proposal = RandomWalkProposal(mcmc_config.γ, mcmc_config.dim)
+proposal_kernel = PDMat(Matrix(I, mcmc_config.dim, mcmc_config.dim))
+if proposal_settings.kernel == "smooth"
+    kernel = SqExpMvNormal(mcmc_config.dim, proposal_settings.lengthscale, proposal_settings.var)
+    proposal_kernel = MvNormal(kernel).Σ
+end
+
+proposal = RandomWalkProposal(mcmc_config.γ, proposal_kernel)
 if lowercase(proposal_settings.type) == "pcn"
     proposal_kernel = Matrix{Float64}(I, mcmc_config.dim, mcmc_config.dim)
-    if proposal_settings.kernel == "smooth"
-        kernel = SqExpMvNormal(mcmc_config.dim, proposal_settings.lengthscale, proposal_settings.var)
-        proposal_kernel = MvNormal(kernel).Σ
-    end
     proposal = pCNProposal(mcmc_config.γ[1], PDMat(proposal_kernel))
 end
 println("Using proposal: $(proposal_settings.type)")
