@@ -10,6 +10,9 @@ using LaTeXStrings
 using MCMCChains
 using Plots
 
+include("my_theme.jl")
+theme(:custom)
+
 experiment = ARGS[1]
 chain_list = String[]
 for (exp,_, files) in walkdir(experiment)
@@ -67,21 +70,21 @@ end
 
 if occursin("width_test", experiment)
     target = s2_targets
-    xlabel = "s2 target"
-    mutarget = "Target=4.0"
-    s2target = "Target=s2"
+    xlabel = L"b^\dagger_w"
+    mutarget = L"b^\dagger_p=4.0"
+    s2target = L"Target=b^\dagger_w"
 else
     target = mu_targets
-    xlabel = "mu target"
-    mutarget = "Target=mu"
-    s2target = "Target=0.05"
+    xlabel = L"b^\dagger_p"
+    mutarget = L"b^\dagger_p"
+    s2target = L"b^\dagger_w=0.05"
 end
 
 pm = scatter(target, mu_means, yerror=(mu_means.-ci_low[:,1], ci_high[:,1].-mu_means),
-label="Mean of mu", xlabel=xlabel, title="Mean of mu across plausible chains")
+title=L"\textrm{True} \ b^\dagger_p  \ \textrm{vs reconstructed} \ \hat{b}_p", xlabel=xlabel, ylabel=L"\hat{b_p}", label=L"\hat{b}_p")
 plot!(pm, target, mu_targets, label=mutarget, linestyle=:dash, color=:red)
 ps = scatter(target, s2_means, yerror=(s2_means.-ci_low[:,2], ci_high[:,2].-s2_means),
- label="Mean of s2", xlabel=xlabel, title="Mean of s2 across plausible chains")
+ title=L"\textrm{True} \ b^\dagger_w \ \textrm{vs reconstructed} \ \hat{b}_w", xlabel=xlabel, ylabel=L"\hat{b}_w", label=L"\hat{b}_w")
 plot!(ps, target, s2_targets, label=s2target, linestyle=:dash, color=:red)
-savefig(pm, joinpath(experiment, "mu_means_ci.png"))
-savefig(ps, joinpath(experiment, "s2_means_ci.png"))
+savefig(pm, joinpath(experiment, "mu_means_ci_tex.pdf"))
+savefig(ps, joinpath(experiment, "s2_means_ci_tex.pdf"))
