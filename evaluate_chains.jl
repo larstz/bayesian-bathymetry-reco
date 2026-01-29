@@ -80,11 +80,11 @@ else
     s2target = L"b^\dagger_w=0.05"
 end
 
-pm = scatter(target, mu_means, yerror=(mu_means.-ci_low[:,1], ci_high[:,1].-mu_means),
-title=L"\textrm{True} \ b^\dagger_p  \ \textrm{vs reconstructed} \ \hat{b}_p", xlabel=xlabel, ylabel=L"\hat{b_p}", label=L"\hat{b}_p")
-plot!(pm, target, mu_targets, label=mutarget, linestyle=:dash, color=:red)
-ps = scatter(target, s2_means, yerror=(s2_means.-ci_low[:,2], ci_high[:,2].-s2_means),
- title=L"\textrm{True} \ b^\dagger_w \ \textrm{vs reconstructed} \ \hat{b}_w", xlabel=xlabel, ylabel=L"\hat{b}_w", label=L"\hat{b}_w")
-plot!(ps, target, s2_targets, label=s2target, linestyle=:dash, color=:red)
+pm = plot(target, mu_targets, label=mutarget, linestyle=:dash, color=:red,
+title=L"\textrm{True} \ b^\dagger_p  \ \textrm{vs reconstructed} \ \hat{b}_p", xlabel=xlabel, ylabel=L"\hat{b_p}")
+scatter!(target, mu_means, yerror=(mu_means.-ci_low[:,1], ci_high[:,1].-mu_means), label=L"\hat{b}_p", color=palette(:default)[1])
+ps = plot(target, s2_targets, label=s2target, linestyle=:dash, color=:red,
+ title=L"\textrm{True} \ b^\dagger_w \ \textrm{vs reconstructed} \ \hat{b}_w", xlabel=xlabel, ylabel=L"\hat{b}_w")
+scatter!(target, s2_means, yerror=(s2_means.-ci_low[:,2], ci_high[:,2].-s2_means), label=L"\hat{b}_w", color=palette(:default)[1])
 savefig(pm, joinpath(experiment, "mu_means_ci_tex.pdf"))
 savefig(ps, joinpath(experiment, "s2_means_ci_tex.pdf"))
