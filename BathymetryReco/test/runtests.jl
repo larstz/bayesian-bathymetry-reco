@@ -106,7 +106,8 @@ end
     likelihood = Normal(0, 1)
     pos = Posterior(prior, likelihood)
     obs = observation_data([1], [1], [1], [1.], 1., [1.])
-    model = mcmc_model(pos, x->x, obs)
+    proposal = Normal(0, 0.1)
+    model = mcmc_model(pos, x->x, obs, proposal)
 
     θ = [0.0]
     logp, logl, logpr = logjoint(model, θ)

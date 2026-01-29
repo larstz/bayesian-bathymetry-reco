@@ -7,6 +7,3 @@ dependencies:
   - dedalus
   - pip:
     - ./BathymetryReco/src/swe_wrapper
-variables:
-  - OMP_NUM_THREADS: 1
-  - NUMEXPR_MAX_THREADS: 1
