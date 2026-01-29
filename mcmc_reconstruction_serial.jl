@@ -37,7 +37,7 @@ println("##############################\nLoad experiment data")
 # Load the data
 if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval,
-    sensor_id  = obs_config.sensor_id)
+    sensor_id  = obs_config.sensor_id, noise_var=obs_config.noise_var)
     exp_type = "heat_tests"
 else
     obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var,
@@ -54,6 +54,7 @@ target_dir = joinpath(io_config.output_dir,
                       "sensor-"*join(obs_config.sensor_id, "-"),
                       "prior-"*join(prior_settings.type,"-"),
                       "proposal-"*proposal_settings.type,
+                      "stepsize-"*join(string.(mcmc_config.γ),"-"),
                       "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
 
 println("Storing results in: $target_dir")

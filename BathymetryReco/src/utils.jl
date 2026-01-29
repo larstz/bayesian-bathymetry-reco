@@ -59,7 +59,7 @@ function load_observation(file_path::String, noise_var::Float64=0.0; sensor_id::
     end
 end
 
-function load_observation(file_path::String, t_start::Float64, t_interval::Float64; sensor_id::Array{Int64}=[2, 3, 4])
+function load_observation(file_path::String, t_start::Float64, t_interval::Float64; sensor_id::Array{Int64}=[2, 3, 4], noise_var::Float64=0.0)
     measurement = CSV.read(file_path, DataFrame)
     id2pos = [3.5, 5.5, 7.5]
     sensor_id = sensor_id .- 1 # convert to 1-based indexing
@@ -75,6 +75,13 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
     t = round.(Vector(observation[:,"Time"]).-t_start, digits=2)
     observation_H = Matrix(observation[:,r"Sensor[2-4]"])./100 .+0.3 # add 30 cm to all measurements, convert cm to m
     observation_H = observation_H[:, sensor_id] # select only the relevant sensors
+
+    # add noise
+    if noise_var > 0.0
+        noise = get_perc_noise(observation_H, noise_var)
+        observation_H = observation_H + noise
+    end
+
     return observation_data(t, sensor_pos, [0.],observation_H, t_start, noise_std)
 end
 

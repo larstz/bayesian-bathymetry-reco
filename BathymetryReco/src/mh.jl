@@ -68,7 +68,7 @@ end
 # Convert to MvNormal
 function Distributions.MvNormal(p::SqExpMvNormal)
     xs = LinRange(1, p.dim, p.dim)
-    C = p.variance .* exp.(-((xs .- xs').^2) / (2*p.lengthscale^2))
+    C = p.variance .* exp.(-((xs .- xs').^2) / (p.lengthscale^2))
     return MvNormal(zeros(p.dim), PDMat(Matrix(C)))
 end
 
