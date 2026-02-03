@@ -207,6 +207,10 @@ function read_mcmc_parameters(config::Dict{String,Any})
     burn_in = config["burn_in"]
     likelihood_σ = config["likelihood_var"]
     init = config["initial"]
+    # Convert Vector{Any} to Vector{Vector{Float64}} for Julia 1.12 TOML compatibility
+    if !isempty(init) && init isa Vector{Any}
+        init = Vector{Float64}[Vector{Float64}(x) for x in init]
+    end
     prior_settings = read_prior_settings(get(config, "prior", nothing))
     proposal_settings = read_proposal_settings(get(config, "proposal", nothing))
     mcmc_params = mcmc_setup(n, dim, n_chains, γ, burn_in, likelihood_σ, prior_settings, proposal_settings, init)
