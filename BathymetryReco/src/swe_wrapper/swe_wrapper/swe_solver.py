@@ -334,6 +334,6 @@ class SWESolver():
 
         for i, sensor_pos in enumerate(pos):
             sol_int = sol(x=sensor_pos)
-            temp[i] = float(sol_int.evaluate()['g'])
+            temp[i] = sol_int.evaluate()['g'].item()
 
         return temp
