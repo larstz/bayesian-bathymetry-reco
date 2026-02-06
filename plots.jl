@@ -10,21 +10,16 @@ using LaTeXStrings
 using Measures
 using Printf
 using MCMCChains
+using CSV
+using DataFrames
 
-width_cm = 18/3
-height_cm = 9/3
-function cm2px(size)
-    dpi = 300
-    return (size[1] * dpi / 2.54, size[2] * dpi / 2.54)
-end
-
-gr()
-default(dpi=300, size=cm2px((width_cm, height_cm)), widen=false, margin=5mm, labelfontsize=12, tickfontsize=12, legendfontsize=12)
+include("my_theme.jl")
+theme(:custom)
 ticks1dec(x) = @sprintf("%.1f", x)
 #default(size=(0.25*0.75*600, 0.25*400))
 date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
-experiment = AGRS[1]
+experiment = ARGS[1]
 exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
 println("Creating plots for experiment: ", experiment)
 config = load_config(joinpath(experiment, "experiment_config.toml"))
@@ -51,7 +46,7 @@ files = readdir(experiment)
 chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
 n_chains = length(chains)
 samples = [deserialize(joinpath(experiment, file)) for file in chains]
-burn_in = 0
+burn_in = 200
 
 # sampled 2σ² instead of σ², so we need to convert it, adjusted after 2025-06-25
 if exp_date < Date(2025,6,25)
@@ -125,10 +120,17 @@ if plot_bathys
         bathy_linf = maximum(abs.(bathy_mean .- exact_b))/maximum(exact_b)*100
         bathy_nrmse = (sqrt(mean(bathy_mean .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b)))*100
 
-        ciplot = plot(x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean), label="95% Credible Interval",
+        metrics_dict = Dict("NRMSE" => bathy_nrmse,
+                    "rL2" => bathy_l2,
+                    "rLinf" => bathy_linf)
+        metrics_df = DataFrame(metrics_dict)
+        metrics_file = joinpath(experiment, "metrics_$(idx)_$(burn_in).csv")
+        CSV.write(metrics_file, metrics_df)
+
+        ciplot = plot(x, exact_b; label="Exact bathymetry", color=:black)
+        plot!(ciplot, x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean),  color=Plots.palette(:default)[1], label="95% Credible Interval",
         ylims=(-0.01,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
-        plot!(x, bathy_mean; label="sample mean\n"*latexstring("\\varepsilon_\\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3)) \\% \\ \\varepsilon_\\mathrm{L2} = $(round(bathy_l2, digits=3))\\% \\ \\varepsilon_\\mathrm{L\\infty} = $(round(bathy_linf, digits=3)) \\%"))
-        plot!(ciplot, x, exact_b; label="Exact bathymetry", color=:black)
+        plot!(ciplot, x, bathy_mean;   color=Plots.palette(:default)[2], label=latexstring("\\bar{b}(x;\\hat{b}^{(i)}_p, \\hat{b}^{(i)}_w) \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))"))
         savefig(ciplot, joinpath(plot_path, "pngs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).png"))
         savefig(ciplot, joinpath(plot_path, "pdfs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).pdf"))
 

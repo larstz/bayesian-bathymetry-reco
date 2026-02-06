@@ -208,7 +208,7 @@ function read_mcmc_parameters(config::Dict{String,Any})
     likelihood_σ = config["likelihood_var"]
     init = config["initial"]
     # Convert Vector{Any} to Vector{Vector{Float64}} for Julia 1.12 TOML compatibility
-    if !isempty(init) && init isa Vector{Any}
+    if init isa Vector{Any}
         init = Vector{Float64}[Vector{Float64}(x) for x in init]
     end
     prior_settings = read_prior_settings(get(config, "prior", nothing))

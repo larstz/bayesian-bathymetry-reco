@@ -39,6 +39,9 @@ if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval,
     sensor_id  = obs_config.sensor_id, noise_var=obs_config.noise_var)
     exp_type = "heat_tests"
+    if occursin("mean", obs_config.path)
+        exp_type = "heat_tests/mean_tests"
+    end
 else
     obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var,
     sensor_rate=obs_config.sensor_rate, sensor_id=obs_config.sensor_id)

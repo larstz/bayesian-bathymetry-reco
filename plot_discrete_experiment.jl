@@ -67,21 +67,23 @@ grid_ci_high = hpd(mcmc_chain)[:, :upper]
 result_df = DataFrame(x=xs, mean_bathy=mean_bathy, ci_low=grid_ci_low, ci_high=grid_ci_high, mcse=grid_error)
 CSV.write(joinpath(exp, "bathy_statistics_$(burnin).csv"), result_df)
 
-bathy_label = L"\mathrm{NRMSE} = %$(round(bathy_nrmse, digits=3))\%"# \\ \mathrm{L}_2 = %$(round(bathy_l2, digits=3))\% \\ \mathrm{L}_\infty = %$(round(bathy_linf, digits=3))\%"
+bathy_label = latexstring("\\bar{b}_i, \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))")
 
 error_plot = scatter(xs, mean_bathy, yerror=grid_error, label="Mean of last $(size(bathy)[1]-burnin) samples",
      ylims=(-0.055,0.21), xlabel=L"x [m]", ylabel=L"b(x) [m]", title="Bathymetry Sample Mean with MCSE Error Bars", grid=true)
-plot!(error_plot, xs, mean_bathy; label=bathy_label)
+plot!(error_plot, xs, mean_bathy; label=bathy_label, color=Plots.palette(:default)[1])
 plot!(error_plot, xs, exact_b, label="True Bathymetry", color=:black)
-scatter!([3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
+scatter!(error_plot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
 savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).png")
 savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).pdf")
 println("Store at $(exp*"/plots/mean_bathy_errorbars.png")")
 
-ciplot = plot(xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .- mean_bathy), label="95% Credible Interval",
+ciplot = plot(xs, exact_b; label="Exact bathymetry", color=:black)
+plot!(ciplot, xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .- mean_bathy),  color=Plots.palette(:default)[1], label="95% Credible Interval",
     ylims=(-0.05,0.21), xlabel=L"x [m]", ylabel=L"b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
-plot!(xs, mean_bathy; label=bathy_label)
-plot!(ciplot, xs, exact_b; label="Exact bathymetry", color=:black)
+plot!(ciplot, xs, mean_bathy; label=bathy_label, color=Plots.palette(:default)[2])
+
+scatter!(ciplot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
 savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).png")
 savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).pdf")
 println("Store at $(exp*"/plots/mean_bathy_credible_interval.png")")
@@ -101,5 +103,5 @@ metrics_dict = Dict("NRMSE" => bathy_nrmse,
                     "rL2" => bathy_l2,
                     "rLinf" => bathy_linf)
 metrics_df = DataFrame(metrics_dict)
-metrics_file = joinpath(exp, "metrics.csv")
+metrics_file = joinpath(exp, "metrics_$(burnin).csv")
 CSV.write(metrics_file, metrics_df)

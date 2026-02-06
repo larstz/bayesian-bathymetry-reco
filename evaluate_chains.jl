@@ -13,10 +13,15 @@ using Plots
 include("my_theme.jl")
 theme(:custom)
 
+# Half size with no whitespace
+half_width = textwidth / 2
+half_height = plot_height/1.5
+plot_size = (half_width, half_height)
+
 experiment = ARGS[1]
 chain_list = String[]
 for (exp,_, files) in walkdir(experiment)
-    if splitdir(exp)[1]*"/" == experiment
+    if rstrip(splitdir(exp)[1], '/') == rstrip(experiment, '/')
         append!(chain_list,joinpath.(exp,filter(x -> occursin(r"chain_[0-9]+.jls", x), files)))
     end
 end
@@ -68,23 +73,33 @@ for (i, id) in enumerate(exp_id)
     ci_high[i,:] = hpd(temp_chain)[:, :upper]
 end
 
+title = ""
+include_title = false
 if occursin("width_test", experiment)
     target = s2_targets
     xlabel = L"b^\dagger_w"
     mutarget = L"b^\dagger_p=4.0"
-    s2target = L"Target=b^\dagger_w"
+    s2target = L"b^\dagger_w"
+    extension = "width"
+    if include_title
+        title = "True "*latexstring("b^\\dagger_w")*" vs reconstructed "*latexstring("\\hat{b}_w")
+    end
 else
     target = mu_targets
     xlabel = L"b^\dagger_p"
     mutarget = L"b^\dagger_p"
     s2target = L"b^\dagger_w=0.05"
+    extension = "position"
+    if include_title
+        title = "True "*latexstring("b^\\dagger_p")*" vs reconstructed "*latexstring("\\hat{b}_p")
+    end
 end
 
 pm = plot(target, mu_targets, label=mutarget, linestyle=:dash, color=:red,
-title=L"\textrm{True} \ b^\dagger_p  \ \textrm{vs reconstructed} \ \hat{b}_p", xlabel=xlabel, ylabel=L"\hat{b_p}")
+title=title, xlabel=xlabel, ylabel=L"\hat{b}_p", size=plot_size, margin=0Plots.mm)
 scatter!(target, mu_means, yerror=(mu_means.-ci_low[:,1], ci_high[:,1].-mu_means), label=L"\hat{b}_p", color=palette(:default)[1])
 ps = plot(target, s2_targets, label=s2target, linestyle=:dash, color=:red,
- title=L"\textrm{True} \ b^\dagger_w \ \textrm{vs reconstructed} \ \hat{b}_w", xlabel=xlabel, ylabel=L"\hat{b}_w")
+ title=title, xlabel=xlabel, ylabel=L"\hat{b}_w", size=plot_size, margin=0Plots.mm)
 scatter!(target, s2_means, yerror=(s2_means.-ci_low[:,2], ci_high[:,2].-s2_means), label=L"\hat{b}_w", color=palette(:default)[1])
-savefig(pm, joinpath(experiment, "mu_means_ci_tex.pdf"))
-savefig(ps, joinpath(experiment, "s2_means_ci_tex.pdf"))
+savefig(pm, joinpath(experiment, "mu_means_ci_tex_$(extension).pdf"))
+savefig(ps, joinpath(experiment, "s2_means_ci_tex_$(extension).pdf"))
