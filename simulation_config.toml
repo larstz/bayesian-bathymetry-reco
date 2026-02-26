@@ -1,23 +1,23 @@
 title = "Toy Measurement Setup"
 
 [output]
-save = true
-path = "./data/toy_measurement"
+save = false
+path = "./data/toy_measurement/"
 
 [simulation]
 xbounds = [1.5, 15.0]
 dealias = 1.5
 scenario = "waterchannel"
-nx = 64
-timestep = 1e-2
+nx = 130
+timestep = 5.0e-5
 kappa = 0.2
 bathymetry = "exact_bathy"
 sensor_position = [3.5, 5.5, 7.5]
 tinterval = 10
 g = 9.81
-bc_file = "./data/mean_bc.txt"
+bc_file = "./data/experiment_data/with_bathymetry/Heat1.txt"
 tstart = 32
 
 [bathymetry]
-parameters = [4.0, 0.5]
-npeaks = 1
+parameters = [5.0, 0.5, 10.5, 1.0]
+npeaks = 2

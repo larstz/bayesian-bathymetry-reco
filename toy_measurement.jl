@@ -3,6 +3,9 @@ Pkg.activate(".")
 using TOML
 using HDF5
 using BathymetryReco
+using Distributions
+using Plots
+using DataInterpolations
 
 cd(@__DIR__)
 
@@ -42,12 +45,19 @@ if problem_bathy == "gaussian"
     end
 elseif  problem_bathy == "exact_bathy"
     global bathy = exp_bathymetry(x)
+elseif problem_bathy == "random"
+    kernel = SqExpMvNormal(nx, 4, 0.005)
+    bathy_dist = MvNormal(kernel)
+    equi_x = collect(range(xbounds[1], xbounds[2], nx))
+    sample_bathy = rand(bathy_dist)
+    global pb = plot(equi_x, sample_bathy, label="sample bathymetry")
+    global bathy = PCHIPInterpolation(sample_bathy, equi_x)(x)
 else
     println("Requested bathymetry type not available")
 end
 
 println("Start Simulation")
-H_sensor, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=sim_config.sensor_pos)
+H_sensor_mean, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=sim_config.sensor_pos)
 println("Simulation Done")
 dx = (xbounds[2]-xbounds[1])/nx
 
@@ -67,6 +77,8 @@ if io_config.save
     cd(sim_path)
     mkpath(sim_details_path)
     cd(sim_details_path)
+    savefig(pb, "sample_bathymetry.png")
+    savefig(pb, "sample_bathymetry.pdf")
     h5open("jl_simulation_data.h5", "w") do file
         file["h"] = h_array
         file["u"] = u_array
