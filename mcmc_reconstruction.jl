@@ -67,16 +67,23 @@ if likelihood_σ == 0.0
 end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
-prior_params = [1.5, 12.0, 0.0, 1.0]
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
-prior_dist = [Uniform(prior_params[1:2]...), Uniform(prior_params[3:4]...)]
+# define prior distributions
+prior_dist = Vector{Distribution}()
+for (i, prior_type) in enumerate(mcmc_config.prior.type)
+    prior_param = [mcmc_config.prior.loc[i], mcmc_config.prior.scale[i]]
+    if prior_type == "normal"
+        push!(prior_dist, Normal(prior_param...))
+    elseif prior_type == "uniform"
+        push!(prior_dist, Uniform(prior_param...))
+    else
+        error("Unsupported prior type: $prior_type")
+    end
+end
 proposal_dist = MvNormal(zeros(mcmc_config.dim),mcmc_config.γ.^2 .* PDiagMat(ones(mcmc_config.dim)))
 
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
-toml_config["sampler"]["prior"] = "$prior_dist"
-toml_config["sampler"]["proposal"] = "$proposal_dist"
-
 
 pos = Posterior(prior_dist, likelihood_dist)
 model = mcmc_model(pos, forward_model, obs_data, proposal_dist)
