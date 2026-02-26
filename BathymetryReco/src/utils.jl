@@ -106,8 +106,8 @@ struct prior_settings
     type:: Array{String,1}
     lengthscale::Float64
     var::Float64
-    loc::Float64
-    scale::Float64
+    loc::Union{Float64, Array{Float64, 1}}
+    scale::Union{Float64, Array{Float64, 1}}
 end
 
 export proposal_settings

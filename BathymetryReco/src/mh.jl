@@ -6,7 +6,7 @@ end
 
 function logprior(p::Posterior, θ)
     logp = 0.0
-    if length(θ) <= 4 # üarametrized bathymetry
+    if length(θ) <= 4 # parametrized bathymetry
         return sum(logpdf.(p.prior, θ))
     end
     for lp in p.prior

@@ -9,6 +9,7 @@ using MCMCChains
 using LaTeXStrings
 using CSV
 using DataFrames
+using DataInterpolations
 
 include("my_theme.jl")
 theme(:custom)
@@ -38,10 +39,18 @@ burnin = 1000
 
 bathy = chain[burnin+1:end,1:mcmc_config.dim]
 lp = chain[burnin+1:end,mcmc_config.dim+1]
-ar = chain[burnin+1:end,mcmc_config.dim+2]
+ar = chain[burnin+1:end,end]
+
+println("Acceptance rate after burn-in: ", round(mean(ar), digits=4))
+println("Acceptance rate at the end of the chain: ", round(ar[end], digits=4))
+
 
 xs = range(1.5,15.0,mcmc_config.dim)
-exact_b = exp_bathymetry(xs)
+if obs_config.real_data || sim_config.bathy_name == "exact_bathy"
+    exact_b = exp_bathymetry(xs)
+else
+    exact_b = PCHIPInterpolation(exact_b, obs_data.sim_x; extrapolation = ExtrapolationType.Constant)(xs)
+end
 
 if ani
 println("#############################\nCreate Gif" )
@@ -99,9 +108,12 @@ for i in 2:4
     savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).pdf"))
 end
 
+println("peak height exp $(exp_bathymetry([4.0]))")
+mean_b_interp = PCHIPInterpolation(mean_bathy, xs; extrapolation=ExtrapolationType.Constant)
 metrics_dict = Dict("NRMSE" => bathy_nrmse,
                     "rL2" => bathy_l2,
-                    "rLinf" => bathy_linf)
+                    "rLinf" => bathy_linf,
+                    "peak" => mean_b_interp(4.0))
 metrics_df = DataFrame(metrics_dict)
 metrics_file = joinpath(exp, "metrics_$(burnin).csv")
 CSV.write(metrics_file, metrics_df)

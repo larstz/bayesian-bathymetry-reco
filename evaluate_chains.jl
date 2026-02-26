@@ -54,7 +54,7 @@ param_names = ["mu", "s2", "lp", "ar"]
 mean_lp = mean(burned_tensor[:, 3, :, :], dims=1)
 d_lp = maximum(mean_lp, dims=2) .- mean_lp
 
-exp_id = [reshape(d_lp[:,:,i].<10, 7) for i in 1:n_targets]
+exp_id = [reshape(d_lp[:,:,i].<2, 7) for i in 1:n_targets]
 
 mu_means = zeros(n_targets)
 s2_means = zeros(n_targets)
@@ -77,29 +77,36 @@ title = ""
 include_title = false
 if occursin("width_test", experiment)
     target = s2_targets
-    xlabel = L"b^\dagger_w"
-    mutarget = L"b^\dagger_p=4.0"
-    s2target = L"b^\dagger_w"
+    xlabel = "target " * latexstring("b_w")
+    mutarget = "target "*latexstring("b_p=4.0")
+    s2target = "target "*latexstring("b_w")
     extension = "width"
     if include_title
-        title = "True "*latexstring("b^\\dagger_w")*" vs reconstructed "*latexstring("\\hat{b}_w")
+        title = "Target "*latexstring("b_w")*" vs reconstructed "*latexstring("b_w")
     end
+    legend_position = [:bottomright, :topleft]
 else
     target = mu_targets
-    xlabel = L"b^\dagger_p"
-    mutarget = L"b^\dagger_p"
-    s2target = L"b^\dagger_w=0.05"
+    xlabel = "target " * latexstring("b_p")
+    mutarget = "target "*latexstring("b_p")
+    s2target = "target "*latexstring("b_w=0.05")
     extension = "position"
     if include_title
-        title = "True "*latexstring("b^\\dagger_p")*" vs reconstructed "*latexstring("\\hat{b}_p")
+        title = "Target "*latexstring("b_p")*" vs reconstructed "*latexstring("b_p")
     end
+    legend_position = [:topleft, :bottomleft]
 end
 
-pm = plot(target, mu_targets, label=mutarget, linestyle=:dash, color=:red,
-title=title, xlabel=xlabel, ylabel=L"\hat{b}_p", size=plot_size, margin=0Plots.mm)
-scatter!(target, mu_means, yerror=(mu_means.-ci_low[:,1], ci_high[:,1].-mu_means), label=L"\hat{b}_p", color=palette(:default)[1])
-ps = plot(target, s2_targets, label=s2target, linestyle=:dash, color=:red,
- title=title, xlabel=xlabel, ylabel=L"\hat{b}_w", size=plot_size, margin=0Plots.mm)
-scatter!(target, s2_means, yerror=(s2_means.-ci_low[:,2], ci_high[:,2].-s2_means), label=L"\hat{b}_w", color=palette(:default)[1])
-savefig(pm, joinpath(experiment, "mu_means_ci_tex_$(extension).pdf"))
-savefig(ps, joinpath(experiment, "s2_means_ci_tex_$(extension).pdf"))
+pm = plot(target, zeros(length(mu_targets)), label=mutarget, color=:brown4, linewidth=0.75,
+title=title, xlabel=xlabel, ylabel="reco - target " * latexstring("b_p"),
+size=plot_size, margin=0Plots.mm, ylims=(-1, 1))
+plot!(target, mu_means.-mu_targets, seriestype=:scatter, yerror=mu_error, label="reco " * latexstring("b_p"), color=palette(:default)[1])
+plot!(pm, legend_position=:bottomleft)
+
+ps = plot(target, zeros(length(s2_targets)), label=s2target, color=:brown4, linewidth=0.75,
+ title=title, xlabel=xlabel, ylabel="reco - target " * latexstring("b_w"), size=plot_size, margin=0Plots.mm, ylims=(-0.1, 0.1))
+scatter!(target, s2_means.-s2_targets, yerror=s2_error, label="reco " * latexstring("b_w"), color=palette(:default)[1])
+plot!(ps, legend_position=:bottomleft)
+
+savefig(pm, joinpath(experiment, "mu_means_mcse_tex_$(extension).pdf"))
+savefig(ps, joinpath(experiment, "s2_means_mcse_tex_$(extension).pdf"))
