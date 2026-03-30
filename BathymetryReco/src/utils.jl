@@ -1,6 +1,20 @@
 
-export observation_data
-struct observation_data
+export ObservationData
+
+"""
+    ObservationData(t, x, sim_x, H, tstart, noise_std)
+
+Data structure to hold the observation data for the bathymetry reconstruction problem.
+
+# Fields
+- `t`: Time points of the observations.
+- `x`: Sensor positions corresponding to the observations.
+- `sim_x`: Spatial grid points used in the simulation.
+- `H`: Observed water surface heights at the sensor positions and time points.
+- `tstart`: Starting time of the observations.
+- `noise_std`: Standard deviation of the noise in the observations.
+"""
+struct ObservationData
     t::Array{Float64}
     x::Array{Float64}
     sim_x::Array{Float64}
@@ -34,8 +48,23 @@ function get_perc_noise(observation::Array{Float64,2}, noise_var::Float64)
     return noise
 end
 
-export load_observation
-function load_observation(file_path::String, noise_var::Float64=0.0; sensor_id::Array{Int64}=[2, 3, 4], sensor_rate::Float64=0.001)
+export load_toy_observation, load_observation
+
+"""
+    load_toy_observation(file_path::String, noise_var::Float64=0.0; sensor_id::Array{Int64}=[2, 3, 4], sensor_rate::Float64=0.001)
+
+Load simulated observation data into an `ObservationData` struct from a file, with options
+for adding noise and selecting specific sensors and sensor rates.
+
+# Arguments
+- `file_path::String`: Path to the file containing the simulated observation data
+- `noise_var::Float64`: Variance of the noise to be added to the observations
+
+# Keywords
+- `sensor_id::Array{Int64}=[2, 3, 4]`: Array of sensor IDs to select from the data
+- `sensor_rate::Float64`: Rate at which sensors measure the observations (default is 0.001)
+"""
+function load_toy_observation(file_path::String, noise_var::Float64=0.0; sensor_id::Array{Int64}=[2, 3, 4], sensor_rate::Float64=0.001)
     id2pos = [3.5, 5.5, 7.5]
     sensor_id = sensor_id .- 1 # convert to 1-based indexing (only Sensors 2, 3, 4 are stored in the file)
     file = joinpath(file_path, "jl_simulation_data.h5")
@@ -55,10 +84,25 @@ function load_observation(file_path::String, noise_var::Float64=0.0; sensor_id::
         observation_H = observation_H + noise
         noise_std = std(noise, dims=1)
         sensor_pos = id2pos[sensor_id]
-        return observation_data(t_measured, sensor_pos, x, observation_H, tstart, noise_std),b
+        return ObservationData(t_measured, sensor_pos, x, observation_H, tstart, noise_std),b
     end
 end
 
+"""
+    load_observation(file_path::String, t_start::Float64, t_interval::Float64; sensor_id::Array{Int64}=[2, 3, 4], noise_var::Float64=0.0)
+
+Load real observation data into an `ObservationData` struct from a file, with options for
+adding noise and selecting specific sensors.
+
+# Arguments
+- `file_path::String`: Path to the file containing the real observation data
+- `t_start::Float64`: Starting time of the observations to be loaded
+- `t_interval::Float64`: Time interval for which to load the observations
+
+# Keywords
+- `sensor_id::Array{Int64}=[2, 3, 4]`: Array of sensor IDs to select from the data
+- `noise_var::Float64`: Variance of the noise to be added to the observations
+"""
 function load_observation(file_path::String, t_start::Float64, t_interval::Float64; sensor_id::Array{Int64}=[2, 3, 4], noise_var::Float64=0.0)
     measurement = CSV.read(file_path, DataFrame)
     id2pos = [3.5, 5.5, 7.5]
@@ -82,11 +126,30 @@ function load_observation(file_path::String, t_start::Float64, t_interval::Float
         observation_H = observation_H + noise
     end
 
-    return observation_data(t, sensor_pos, [0.],observation_H, t_start, noise_std)
+    return ObservationData(t, sensor_pos, [0.], observation_H, t_start, noise_std)
 end
 
-export simulation_setup
-struct simulation_setup
+export SimulationSetup
+"""
+    SimulationSetup(xbounds, sensor_pos, timestep, nx, tstart, tinterval, g, kappa, dealias, scenario, bc_file)
+
+Data structure to hold the simulation parameters for the shallow water equations solver.
+
+# Fields
+- `xbounds`: Spatial bounds of the simulation domain
+- `sensor_pos`: Positions of the sensors in the simulation domain
+- `timestep`: Time step for the simulation
+- `nx`: Number of spatial grid points in the simulation
+- `tstart`: Starting time of the simulation
+- `tinterval`: Total time interval for the simulation
+- `g`: Gravitational acceleration constant
+- `kappa`: friction parameter for the shallow water equations
+- `dealias`: Dealiasing factor for the spectral solver
+- `scenario`: String identifier for the simulation scenario
+- `bc_file`: Path to the file containing boundary condition data for the simulation
+- `bathy_name`: String identifier for the type of bathymetry used in the simulation
+"""
+struct SimulationSetup
     xbounds::Array{Float64, 1}
     sensor_pos::Array{Float64, 1}
     timestep::Float64
@@ -101,8 +164,16 @@ struct simulation_setup
     bathy_name::String
 end
 
-export prior_settings
-struct prior_settings
+export PriorSettings
+"""
+    PriorSettings(type, lengthscale, var, loc, scale)
+
+Data structure to hold the settings for the prior distribution used in the MCMC sampling.
+
+# Fields
+- `type`: Array of strings specifying the type(s) of prior distribution(s) (e
+"""
+struct PriorSettings
     type:: Array{String,1}
     lengthscale::Float64
     var::Float64
@@ -110,29 +181,29 @@ struct prior_settings
     scale::Union{Float64, Array{Float64, 1}}
 end
 
-export proposal_settings
-struct proposal_settings
+export ProposalSettings
+struct ProposalSettings
     type::String
     kernel::String
     lengthscale::Float64
     var::Float64
 end
 
-export mcmc_setup
-struct mcmc_setup
+export MCMCSetup
+struct MCMCSetup
     n::Int
     dim::Int
     n_chains::Int
     γ::Union{Float64, Array{Float64, 1}}
     burn_in::Int
     likelihood_σ::Union{Float64, Array{Float64, 1}}
-    prior::Union{prior_settings, Nothing}
-    proposal::Union{proposal_settings, Nothing}
+    prior::Union{PriorSettings, Nothing}
+    proposal::Union{ProposalSettings, Nothing}
     initial_θ::Union{Array{Float64, 1}, Array{Array{Float64, 1}, 1}, Array{Union{}, 1}}
 end
 
-export observation_settings
-struct observation_settings
+export ObservationSettings
+struct ObservationSettings
     path::String
     real_data::Bool
     noise_var::Float64
@@ -140,22 +211,22 @@ struct observation_settings
     sensor_id::Array{Int64, 1}
 end
 
-export io_settings
-struct io_setup
+export IOSettings
+struct IOSettings
     save::Bool
     output_dir::String
 end
 
-export reconstructor
-struct reconstructor
-    sim_params::simulation_setup
-    mcmc_params::mcmc_setup
-    obs_settings::observation_settings
-    io_settings::io_setup
+export Reconstructor
+struct Reconstructor
+    sim_params::SimulationSetup
+    mcmc_params::MCMCSetup
+    obs_settings::ObservationSettings
+    io_settings::IOSettings
 end
 
-export bathymetry_setup
-struct bathymetry_setup
+export BathymetrySetup
+struct BathymetrySetup
     θ::Array{Float64,1}
     n_peaks::Int
 end
@@ -167,7 +238,7 @@ function load_config(file_path::String)
     mcmc_params = read_mcmc_parameters(config["sampler"])
     obs_settings = read_observation_settings(config["observation"])
     io_settings = read_io_settings(config["output"])
-    return reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
+    return Reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
 end
 
 function load_config(config::Dict{String,Any})
@@ -175,7 +246,7 @@ function load_config(config::Dict{String,Any})
     mcmc_params = read_mcmc_parameters(config["sampler"])
     obs_settings = read_observation_settings(config["observation"])
     io_settings = read_io_settings(config["output"])
-    return reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
+    return Reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
 end
 
 export read_simulation_parameters
@@ -192,9 +263,7 @@ function read_simulation_parameters(config::Dict{String,Any})
     scenario = config["scenario"]
     bc_file = config["bc_file"]
     problem_bathy = config["bathymetry"]
-    sim_params = simulation_setup(xbounds, sensor_pos, timestep,
-                                  nx, tstart, tend, g, kappa, dealias,
-                                  scenario, bc_file, problem_bathy)
+    sim_params = SimulationSetup(xbounds, sensor_pos, timestep, nx, tstart, tend, g, kappa, dealias, scenario, bc_file, problem_bathy)
     return sim_params
 end
 
@@ -213,7 +282,7 @@ function read_mcmc_parameters(config::Dict{String,Any})
     end
     prior_settings = read_prior_settings(get(config, "prior", nothing))
     proposal_settings = read_proposal_settings(get(config, "proposal", nothing))
-    mcmc_params = mcmc_setup(n, dim, n_chains, γ, burn_in, likelihood_σ, prior_settings, proposal_settings, init)
+    mcmc_params = MCMCSetup(n, dim, n_chains, γ, burn_in, likelihood_σ, prior_settings, proposal_settings, init)
     return mcmc_params
 end
 
@@ -227,7 +296,7 @@ function read_prior_settings(config::Union{Dict{String,Any}, Nothing})
     var = get(config, "var", 0.0)
     loc = get(config, "loc", 0.0)
     scale = get(config, "scale", 1.0)
-    return prior_settings(type, lengthscale, var, loc, scale)
+    return PriorSettings(type, lengthscale, var, loc, scale)
 end
 
 read_prior_settings(config::String) = nothing
@@ -242,7 +311,7 @@ function read_proposal_settings(config::Union{Dict{String,Any}, Nothing})
     kernel = get(config, "kernel", "")
     lengthscale = get(config, "lengthscale", 0.0)
     var = get(config, "var", 0.0)
-    return proposal_settings(type, kernel, lengthscale, var)
+    return ProposalSettings(type, kernel, lengthscale, var)
 end
 
 export read_observation_settings
@@ -252,7 +321,7 @@ function read_observation_settings(config::Dict{String,Any})
     noise_var = config["noise_var"]
     sensor_id = config["sensor_id"]
     sensor_rate = config["sensor_rate"]
-    obs_settings = observation_settings(path, real_data, noise_var, sensor_rate, sensor_id)
+    obs_settings = ObservationSettings(path, real_data, noise_var, sensor_rate, sensor_id)
     return obs_settings
 end
 
@@ -260,7 +329,7 @@ export read_io_settings
 function read_io_settings(config::Dict{String,Any})
     save = config["save"]
     path = config["path"]
-    io_settings = io_setup(save, path)
+    io_settings = IOSettings(save, path)
     return io_settings
 end
 
@@ -268,6 +337,6 @@ export read_bathymetry_parameters
 function read_bathymetry_parameters(config::Dict{String,Any})
     params = config["parameters"]
     npeaks = config["npeaks"]
-    bathy_params = bathymetry_setup(params, npeaks)
+    bathy_params = BathymetrySetup(params, npeaks)
     return bathy_params
 end

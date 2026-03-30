@@ -37,7 +37,7 @@ if obs_config.real_data
     x = Vector(LinRange(sim_config.xbounds[1], sim_config.xbounds[2], sim_config.nx))
     exact_b = exp_bathymetry(x)
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+    obs_data, exact_b = load_toy_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
     x = obs_data.sim_x
 end
 
@@ -102,7 +102,7 @@ if plot_bathys
         mean_params = vec(mean(burnin_chain[:, 1:end-4], dims=1))
         rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2))*100, digits=2)
 
-        pb = plot(x, exact_b; c=:black, xlabel="x [m]", ylabel="b(x) [m]", label="Exact bathymetry", xlim=(1.5,12))
+        pb = plot(x, exact_b; c=:black, xlabel=L"x \ [m]", ylabel=L"b(x) \ [m]", label="Exact bathymetry", xlim=(1.5,12))
         plot!(pb, x, bathys'; label=permutedims(vcat([latexstring("b(x; \\mu_i, \\sigma^2_i),\\ i \\in [n]")], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
         #plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
         plot!(pb, x, bathymetry(x, mean_params); c=:blue, label=latexstring("b(x; \\bar{\\mu},\\bar{\\sigma}^2),\\ \\varepsilon_\\mathrm{L2}=$(rel_l2_error)\\%"))
@@ -127,9 +127,8 @@ if plot_bathys
         metrics_file = joinpath(experiment, "metrics_$(idx)_$(burn_in).csv")
         CSV.write(metrics_file, metrics_df)
 
-        ciplot = plot(x, exact_b; label="Exact bathymetry", color=:black)
-        plot!(ciplot, x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean),  color=Plots.palette(:default)[1], label="95% Credible Interval",
-        ylims=(-0.01,0.21), xlabel="x [m]", ylabel="b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
+        ciplot = plot(x, exact_b; label="Exact bathymetry", color=:black, ylims=(-0.01,0.21), xlabel=L"x \ [m]", ylabel=L"b(x) \ [m]")
+        plot!(ciplot, x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean),  color=Plots.palette(:default)[1], label="95% Credible Interval")
         plot!(ciplot, x, bathy_mean;   color=Plots.palette(:default)[2], label=latexstring("\\bar{b}(x;\\hat{b}^{(i)}_p, \\hat{b}^{(i)}_w) \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))"))
         savefig(ciplot, joinpath(plot_path, "pngs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).png"))
         savefig(ciplot, joinpath(plot_path, "pdfs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).pdf"))
@@ -139,7 +138,7 @@ if plot_bathys
 
         rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4)
         for i in 2:4
-            psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
+            psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel=L"t \ [s]", ylabel=L"H \ [m]", linestyle=:dash)
             plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
             savefig(psim, joinpath(plot_path, "pngs", "sim_chain_$(idx)_sensor_$(i).png"))
             savefig(psim, joinpath(plot_path, "pdfs", "sim_chain_$(idx)_sensor_$(i).pdf"))

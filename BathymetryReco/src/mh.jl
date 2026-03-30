@@ -133,10 +133,10 @@ function Distributions.MvNormal(p::SqExpMvNormal)
     return MvNormal(zeros(p.dim), PDMat(Matrix(C)))
 end
 
-export mcmc_model
+export MCMCModel
 
 """
-    mcmc_model(posterior, forward, observation, proposal)
+    MCMCModel(posterior, forward, observation, proposal)
 
 Define a model for MCMC sampling, encapsulating the posterior distribution, forward model,
 observed data, and proposal distribution.
@@ -233,7 +233,6 @@ function sample_chain(model::MCMCModel, setup::MCMCSetup; kargs...)
         model,
         setup.n,
         setup.init;
-        γ = setup.γ,
         burn_in = setup.burn_in,
         kargs...,
     )
@@ -244,7 +243,6 @@ function sample_chain(model::MCMCModel, setup::MCMCSetup, initial_θ; kargs...)
         model,
         setup.n,
         initial_θ;
-        γ = setup.γ,
         burn_in = setup.burn_in,
         kargs...,
     )

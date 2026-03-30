@@ -123,7 +123,7 @@ toml_config["sampler"]["likelihood_var"] = likelihood_σ
 
 # Put everything into the MCMC model
 pos = Posterior(prior_dist, likelihood_dist)
-model = mcmc_model(pos, forward_model, obs_data, proposal)
+model = MCMCModel(pos, forward_model, obs_data, proposal)
 
 # Define initial parameters
 init_θ = mcmc_config.initial_θ
@@ -132,7 +132,8 @@ if isempty(init_θ)
     #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
     xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
     init_θ = [bathymetry(xs, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
-    init_θ[1] .= 0.0 #exp_bathymetry(xs) # set first chain to correct bathymetry
+    # init_θ[1] .= 0.0 # set first chain to correct bathymetry
+    init_θ[1] .= rand(prior_dist[1]) # set first chain to random sample from prior
     toml_config["sampler"]["init"] = init_θ
     inip = plot(xs, init_θ[1])
 end

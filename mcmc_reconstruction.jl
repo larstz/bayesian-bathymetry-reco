@@ -86,7 +86,7 @@ proposal_dist = MvNormal(zeros(mcmc_config.dim),mcmc_config.γ.^2 .* PDiagMat(on
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 
 pos = Posterior(prior_dist, likelihood_dist)
-model = mcmc_model(pos, forward_model, obs_data, proposal_dist)
+model = MCMCModel(pos, forward_model, obs_data, proposal_dist)
 
 init_θ = mcmc_config.initial_θ
 
