@@ -5,7 +5,7 @@ using Distributions
 @testset verbose=true "Test utils" begin
     @testset "load_observation" begin
         sensor_rate = 0.1
-        obs_data, b = load_observation("./test_data/", sensor_rate=sensor_rate)
+        obs_data, b = load_toy_observation("./test_data/", sensor_rate=sensor_rate)
         measurement_data = load_observation("./test_data/test_measurement.txt", 32.0, 10.0)
         @test size(obs_data.H) == (length(obs_data.t), length(obs_data.x))
         @test length(obs_data.t) == 10/sensor_rate+1.
@@ -105,9 +105,9 @@ end
     prior = [Uniform(-1, 1)]
     likelihood = Normal(0, 1)
     pos = Posterior(prior, likelihood)
-    obs = observation_data([1], [1], [1], [1.], 1., [1.])
+    obs = ObservationData([1], [1], [1], [1.], 1., [1.])
     proposal = Normal(0, 0.1)
-    model = mcmc_model(pos, x->x, obs, proposal)
+    model = MCMCModel(pos, x->x, obs, proposal)
 
     θ = [0.0]
     logp, logl, logpr = logjoint(model, θ)
@@ -122,8 +122,8 @@ end
 
 @testset "Test swe" begin
     sim_params = load_config("./test_data/test_config.toml").sim_params
-    obs_data, b = load_observation("./test_data/", sensor_rate=0.1)
-    real_data = load_observation("./test_data/test_measurement.txt", sim_params.tstart, sim_params.tinterval)
+    obs_data, b = load_toy_observation("./test_data/", sensor_rate=0.1)
+    real_data = load_observation("./test_data/test_measurement.txt", 32.0, 10.0)
     sim_observations = simulation([4.0, 0.05, 0.2], sim_params, obs_data)
     sim_real = simulation([4.0, 0.05, 0.2], sim_params, real_data)
 
