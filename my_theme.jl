@@ -23,3 +23,20 @@ add_theme(:custom, PlotTheme(
     size = (textwidth, plot_height),  # 390pt width for PDF
     dpi=72
 ))
+
+scale = 1.5
+
+add_theme(:custom_slides, PlotTheme(
+    fontfamily = plot_font,
+    linewidth = 1*scale,
+    markersize = 2*scale,
+    labelfontsize = 8*scale,
+    tickfontsize = 8*scale,
+    legendfontsize = 8*scale,
+    titlefontsize = 8*scale,
+    framestyle = :box,
+    label = nothing,
+    margin = 0mm,
+    size = (textwidth, plot_height),  # 390pt width for PDF
+    dpi=72
+))
