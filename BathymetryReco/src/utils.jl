@@ -171,7 +171,11 @@ export PriorSettings
 Data structure to hold the settings for the prior distribution used in the MCMC sampling.
 
 # Fields
-- `type`: Array of strings specifying the type(s) of prior distribution(s) (e
+- `type`: Array of strings specifying the type(s) of prior distribution(s)
+- `lengthscale`: Lengthscale parameter for squared exponential covariance (Gaussian)
+- `var`: Variance parameter for the prior distribution (Gaussian)
+- `loc`: Location parameter for the prior distribution (Cauchy, Uniform left bound)
+- `scale`: Scale parameter for the prior distribution (Cauchy, Uniform right bound)
 """
 struct PriorSettings
     type:: Array{String,1}
@@ -182,6 +186,17 @@ struct PriorSettings
 end
 
 export ProposalSettings
+"""
+    ProposalSettings(type, kernel, lengthscale, var)
+
+Data structure to hold the settings for the proposal distribution used in the MCMC sampling.
+
+# Fields
+- `type`: String specifying the type of proposal distribution (e.g., "rw", "pCN")
+- `kernel`: String specifying the kernel type for Gaussian proposals (e.g., "smooth" for squared exponential)
+- `lengthscale`: Lengthscale parameter for the proposal distribution (if applicable)
+- `var`: Variance parameter for the proposal distribution (if applicable)
+"""
 struct ProposalSettings
     type::String
     kernel::String
@@ -190,6 +205,22 @@ struct ProposalSettings
 end
 
 export MCMCSetup
+"""
+    MCMCSetup(n, dim, n_chains, γ, burn_in, likelihood_σ, prior, proposal, initial_θ)
+
+Data structure to hold the settings for the MCMC sampling process.
+
+# Fields
+- `n`: Number of MCMC samples to draw
+- `dim`: Dimensionality of the parameter space
+- `n_chains`: Number of (parallel) MCMC chains to run
+- `γ`: Step size for the proposal distribution (can be a scalar or an array containing step sizes for each parameter)
+- `burn_in`: Number of initial samples to discard as burn-in
+- `likelihood_σ`: Standard deviation of the noise in the likelihood function (can be a scalar or an array containing standard deviations for each observation)
+- `prior`: PriorSettings struct containing the settings for the prior distribution
+- `proposal`: ProposalSettings struct containing the settings for the proposal distribution
+- `initial_θ`: Initial parameter values for the MCMC chains (can be an array of parameter vectors, one for each chain)
+"""
 struct MCMCSetup
     n::Int
     dim::Int
@@ -203,6 +234,18 @@ struct MCMCSetup
 end
 
 export ObservationSettings
+"""
+    ObservationSettings(path, real_data, noise_var, sensor_rate, sensor_id)
+
+Data structure to hold the settings for the observation data used in the MCMC sampling.
+
+# Fields
+- `path`: String specifying the path to the observation data file
+- `real_data`: Boolean indicating whether the observation data is experimental or simulated
+- `noise_var`: Variance of the noise to be added to the observations (if simulated) or estimated from the data (if real)
+- `sensor_rate`: Rate of measurements of the observations to be used in the reconstruction
+- `sensor_id`: Array of integers specifying the IDs of the sensors to be used in the reconstruction
+"""
 struct ObservationSettings
     path::String
     real_data::Bool
@@ -212,12 +255,32 @@ struct ObservationSettings
 end
 
 export IOSettings
+"""
+    IOSettings(save, output_dir)
+
+Data structure to hold the settings for storing the results of the MCMC sampling process.
+
+# Fields
+- `save`: Boolean indicating whether to save the results of the MCMC sampling
+- `output_dir`: String specifying the directory where the results should be saved
+"""
 struct IOSettings
     save::Bool
     output_dir::String
 end
 
 export Reconstructor
+"""
+    Reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
+
+Data structure to hold all the settings for the bathymetry reconstruction process, including the simulation parameters, MCMC sampling parameters, observation settings, and I/O settings.
+
+# Fields
+- `sim_params`: SimulationSetup struct containing the settings for the shallow water equations simulation
+- `mcmc_params`: MCMCSetup struct containing the settings for the MCMC sampling
+- `obs_settings`: ObservationSettings struct containing the settings for the observation data
+- `io_settings`: IOSettings struct containing the settings for storing the results of the MCMC
+"""
 struct Reconstructor
     sim_params::SimulationSetup
     mcmc_params::MCMCSetup
@@ -226,12 +289,29 @@ struct Reconstructor
 end
 
 export BathymetrySetup
+"""
+    BathymetrySetup(θ, n_peaks)
+
+Data structure to hold the parameters for the bathymetry used in the simulation.
+
+# Fields
+- `θ`: Array of parameters for the bathymetry
+- `n_peaks`: Number of peaks in the bathymetry (if applicable)
+"""
 struct BathymetrySetup
     θ::Array{Float64,1}
     n_peaks::Int
 end
 
 export load_config
+"""
+    load_config(file_path::String)
+
+Load the configuration settings for the bathymetry reconstruction process from a TOML file and return a `Reconstructor` struct containing all the settings.
+
+# Arguments
+- `file_path::String`: Path to the TOML configuration file
+"""
 function load_config(file_path::String)
     config = TOML.parsefile(file_path)
     sim_params = read_simulation_parameters(config["simulation"])
@@ -241,6 +321,13 @@ function load_config(file_path::String)
     return Reconstructor(sim_params, mcmc_params, obs_settings, io_settings)
 end
 
+"""
+    read_simulation_parameters(config::Dict{String,Any})
+Read the simulation parameters from a dictionary (parsed from a TOML file) and return a `Reconstructor` struct containing the simulation settings.
+
+# Arguments
+- `config::Dict{String,Any}`: Dictionary containing the configuration parameters
+"""
 function load_config(config::Dict{String,Any})
     sim_params = read_simulation_parameters(config["simulation"])
     mcmc_params = read_mcmc_parameters(config["sampler"])
@@ -250,6 +337,10 @@ function load_config(config::Dict{String,Any})
 end
 
 export read_simulation_parameters
+"""
+    read_simulation_parameters(config::Dict{String,Any})
+Read the simulation parameters from a dictionary (parsed from a TOML file) and return a `SimulationSetup` struct containing the simulation settings.
+"""
 function read_simulation_parameters(config::Dict{String,Any})
     xbounds = config["xbounds"]
     sensor_pos = config["sensor_position"]
@@ -268,6 +359,10 @@ function read_simulation_parameters(config::Dict{String,Any})
 end
 
 export read_mcmc_parameters
+"""
+    read_mcmc_parameters(config::Dict{String,Any})
+Read the MCMC sampling parameters from a dictionary (parsed from a TOML file) and return an `MCMCSetup` struct containing the MCMC settings.
+"""
 function read_mcmc_parameters(config::Dict{String,Any})
     n = config["n_samples"]
     dim = get(config, "nx", 64)
@@ -287,6 +382,10 @@ function read_mcmc_parameters(config::Dict{String,Any})
 end
 
 export read_prior_settings
+"""
+    read_prior_settings(config::Union{Dict{String,Any}, Nothing})
+Read the prior distribution settings from a dictionary (parsed from a TOML file) and return a `PriorSettings` struct containing the prior distribution settings. If the input is `nothing`, return `nothing`.
+"""
 function read_prior_settings(config::Union{Dict{String,Any}, Nothing})
     if config === nothing
         return nothing
@@ -303,6 +402,10 @@ read_prior_settings(config::String) = nothing
 read_proposal_settings(config::String) = nothing
 
 export read_proposal_settings
+"""
+    read_proposal_settings(config::Union{Dict{String,Any}, Nothing})
+Read the proposal distribution settings from a dictionary (parsed from a TOML file) and return a `ProposalSettings` struct containing the proposal distribution settings.   If the input is `nothing`, return `nothing`.
+"""
 function read_proposal_settings(config::Union{Dict{String,Any}, Nothing})
     if config === nothing
         return nothing
@@ -315,6 +418,10 @@ function read_proposal_settings(config::Union{Dict{String,Any}, Nothing})
 end
 
 export read_observation_settings
+"""
+    read_observation_settings(config::Dict{String,Any})
+Read the observation settings from a dictionary (parsed from a TOML file) and return an `ObservationSettings` struct containing the observation settings.
+"""
 function read_observation_settings(config::Dict{String,Any})
     path = config["path"]
     real_data = config["real_data"]
@@ -326,6 +433,10 @@ function read_observation_settings(config::Dict{String,Any})
 end
 
 export read_io_settings
+"""
+    read_io_settings(config::Dict{String,Any})
+Read the I/O settings from a dictionary (parsed from a TOML file) and return an `IOSettings` struct containing the I/O settings.
+"""
 function read_io_settings(config::Dict{String,Any})
     save = config["save"]
     path = config["path"]
@@ -334,6 +445,10 @@ function read_io_settings(config::Dict{String,Any})
 end
 
 export read_bathymetry_parameters
+"""
+    read_bathymetry_parameters(config::Dict{String,Any})
+Read the bathymetry parameters from a dictionary (parsed from a TOML file) and return a `BathymetrySetup` struct containing the bathymetry parameters.
+"""
 function read_bathymetry_parameters(config::Dict{String,Any})
     params = config["parameters"]
     npeaks = config["npeaks"]
