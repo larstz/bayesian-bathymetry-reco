@@ -28,10 +28,11 @@ function common_colorrange(mats...)
     maxs = Float64[]
     for mat in mats
         mat_min, mat_max = finite_minmax(mat)
+        println("Matrix min: ", mat_min, " max: ", mat_max)
         push!(mins, mat_min)
         push!(maxs, mat_max)
     end
-    return (minimum(mins), maximum(maxs))
+    return (maximum(mins), maximum(maxs))
 end
 
 println("Read in data from disk")
@@ -61,14 +62,20 @@ lp_mat[lp_mat .== -Inf] .= NaN
 ll_mat = permutedims(reshape(lls, length(σs), length(μs)))./scale_vals
 pr_mat = permutedims(reshape(prs, length(σs), length(μs)))
 
+priors = [[Uniform(1.5, 12.5), Uniform(0.001, 1.0)],
+          [Normal(4.0, 0.1), Uniform(0.001, 1.0)],
+          [Normal(4.0, 0.05), Normal(0.05, 0.01)]]
+lp_test_mats = []
 if test_prior
-    t_prior = [Normal(4.0, 0.1), Normal(0.05, 0.005)]
-    prior_vals = get_prior(t_prior, p_grid)
-    pr_mat_test = permutedims(reshape(prior_vals, length(σs), length(μs)))
-    lp_test_mat = pr_mat_test./scale_vals .+ ll_mat
+    for prior in priors
+        prior_vals = get_prior(prior, p_grid)
+        pr_mat_test = permutedims(reshape(prior_vals, length(σs), length(μs)))
+        lp_test_mat = pr_mat_test./scale_vals .+ ll_mat
+        push!(lp_test_mats, lp_test_mat)
+    end
 end
 
-common_cr = test_prior ? common_colorrange(lp_mat, ll_mat, lp_test_mat) : common_colorrange(lp_mat, ll_mat)
+common_cr = test_prior ? common_colorrange(lp_mat, ll_mat, lp_test_mats...) : common_colorrange(lp_mat, ll_mat)
 levels = range(common_cr[1], common_cr[2], length=50)
 
 println("Plotting log-posterior")
@@ -85,15 +92,18 @@ contll = contourf!(axll,μs, σs, ll_mat; nan_color=:white, levels=levels)
 Colorbar(fll[1, 2], contll)
 Label(fll[1, 2, Top()], halign=:left, text=L"\times10^3")
 
+test_plots = []
 if test_prior
-    println("Plotting test log-posterior with prior")
-    fpr = Figure()
-    axpr = Axis(fpr[1, 1]; title=latexstring("\\log\\pi_L(H|b)+\\log\\pi_\\mathrm{Prior}(b)"), xlabel=xlabel, ylabel=ylabel, xticks=1.5:1.:12.5, yticks=[0.01,0.05:0.05:0.5...])
-    contpr = contourf!(axpr,μs, σs, lp_test_mat; nan_color=:white, levels=50)
-    Colorbar(fpr[1, 2], contpr)
-    Label(fpr[1, 2, Top()], halign=:left, text=L"\times10^3")
+    for lp_test in lp_test_mats
+        println("Plotting test log-posterior with prior")
+        fpr = Figure()
+        axpr = Axis(fpr[1, 1]; title=latexstring("\\log\\pi_L(H|b)+\\log\\pi_\\mathrm{Prior}(b)"), xlabel=xlabel, ylabel=ylabel, limits=(xlims, ylims),xticks=1.5:1.:12.5, yticks=[0.01,0.05:0.05:0.5...])
+        contpr = contourf!(axpr,μs, σs, lp_test; nan_color=:white, levels=levels, extendlow=:auto)
+        Colorbar(fpr[1, 2], contpr)
+        Label(fpr[1, 2, Top()], halign=:left, text=L"\times10^3")
+        push!(test_plots, [fpr])
+    end
 end
-
 cd(lp_experiment)
 
 save("log_posterior.png", f)
@@ -103,8 +113,10 @@ save("log_likelihood.png", fll)
 save("log_likelihood.pdf", fll; pt_per_unit)
 
 if test_prior
-    save("log_prior_N401_N005001_plus_likelihood.png", fpr)
-    save("log_prior_N401_N005001_plus_likelihood.pdf", fpr; pt_per_unit)
+    for (i, fpr) in enumerate(test_plots)
+        save("log_prior_$(priors[i])_plus_likelihood.png", fpr[1])
+        save("log_prior_$(priors[i])_plus_likelihood.pdf", fpr[1]; pt_per_unit)
+    end
 end
 
 cd(cwd)
@@ -122,7 +134,7 @@ if length(ARGS) == 2
         μ = chain[:, 1]
         σ = chain[:, 2]
         scatter!(axpr, μ[1], σ[1], color=line_colors[i], markersize=5)
-        lines!(axpr, μ, σ, label="Chain $(i)", color=line_colors[i], linewidth=2)
+        lines!(axpr, μ, σ, color=line_colors[i], linewidth=2)
     end
 
     println("Plotting max posterior")
@@ -130,11 +142,14 @@ if length(ARGS) == 2
     println("Max Posterior: ", idmax)
     max_p = p_grid[:, idmax]
     println("Max Posterior: ", max_p)
-    scatter!(axpr, max_p[1], max_p[2], color=:black, label="Max Posterior", markersize=5)
-    axislegend(axpr)
+    scatter!(axpr, max_p[1], max_p[2], color=:black, markersize=5)
+    chain_elem = [LineElement(color=line_colors[i], linestyle=nothing,
+        linepoints=Point2f[(0, i/(n_chains+1)), (1, i/(n_chains+1))]) for i in 1:n_chains]
+    max_elem = MarkerElement(color=:black, marker=:circle, markersize=5)
+    axislegend(axpr, [chain_elem, max_elem], ["Chains", "Max Posterior"])
 
     cd(chain_experiment)
 
-    save("log_posterior_with_chains.png", fpr, px_per_unit=300/96)
-    save("log_posterior_with_chains.pdf", fpr, px_per_unit=300/96)
+    save("log_posterior_with_chains.png", fpr)
+    save("log_posterior_with_chains.pdf", fpr; pt_per_unit)
 end
