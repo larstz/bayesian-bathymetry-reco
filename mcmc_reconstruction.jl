@@ -25,7 +25,7 @@ using LinearAlgebra
     using BathymetryReco
     using Random
 
-    Random.seed!(161)
+    Random.seed!(1910)
 end
 
 ENV["GKSwstype"]="nul"
@@ -138,7 +138,7 @@ println("Using proposal: $(proposal_settings.type)")
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 
 pos = Posterior(prior_dist, likelihood_dist)
-model = MCMCModel(pos, forward_model, obs_data, proposal_dist)
+model = MCMCModel(pos, forward_model, obs_data, proposal)
 
 init_θ = mcmc_config.initial_θ
 

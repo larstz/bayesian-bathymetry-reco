@@ -23,7 +23,7 @@ using ProgressMeter
 
 using Random
 
-Random.seed!(161)
+Random.seed!(1910)
 
 ENV["GKSwstype"]="nul"
 
@@ -63,7 +63,7 @@ if obs_config.real_data
         exp_type = "heat_tests/mean_tests"
     end
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var,
+    obs_data, exact_b = load_toy_observation(obs_config.path, obs_config.noise_var,
     sensor_rate=obs_config.sensor_rate, sensor_id=obs_config.sensor_id)
     exp_type = "toy_tests"
 end
