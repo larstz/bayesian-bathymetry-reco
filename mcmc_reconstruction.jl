@@ -119,8 +119,21 @@ for (i, prior_type) in enumerate(mcmc_config.prior.type)
         error("Unsupported prior type: $prior_type")
     end
 end
-proposal_dist = MvNormal(zeros(mcmc_config.dim),mcmc_config.γ.^2 .* PDiagMat(ones(mcmc_config.dim)))
 
+# define proposal distribution
+proposal_kernel = PDMat(Matrix(I, mcmc_config.dim, mcmc_config.dim))
+if proposal_settings.kernel == "smooth"
+    kernel = SqExpMvNormal(mcmc_config.dim, proposal_settings.lengthscale, proposal_settings.var)
+    proposal_kernel = MvNormal(kernel).Σ
+end
+
+proposal = RandomWalkProposal(mcmc_config.γ, proposal_kernel)
+
+if lowercase(proposal_settings.type) == "pcn"
+    proposal_kernel = Matrix{Float64}(I, mcmc_config.dim, mcmc_config.dim)
+    proposal = pCNProposal(mcmc_config.γ[1], PDMat(proposal_kernel))
+end
+println("Using proposal: $(proposal_settings.type)")
 # add newly calculated information to config
 toml_config["sampler"]["likelihood_var"] = likelihood_σ
 

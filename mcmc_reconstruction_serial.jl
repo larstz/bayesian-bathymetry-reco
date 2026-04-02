@@ -127,6 +127,7 @@ if proposal_settings.kernel == "smooth"
 end
 
 proposal = RandomWalkProposal(mcmc_config.γ, proposal_kernel)
+
 if lowercase(proposal_settings.type) == "pcn"
     proposal_kernel = Matrix{Float64}(I, mcmc_config.dim, mcmc_config.dim)
     proposal = pCNProposal(mcmc_config.γ[1], PDMat(proposal_kernel))
