@@ -18,6 +18,9 @@ println("#############################\nRead in chain" )
 
 exp = ARGS[1]
 ani = false
+include_adjoint = false
+plot_sensor_simulation = true
+appendix = ""
 chain = deserialize(joinpath(exp, "chain_1.jls"))
 
 config = load_config(joinpath(exp, "experiment_config.toml"))
@@ -28,8 +31,12 @@ obs_config = config.obs_settings
 # Load the data
 if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
+    adjoint_file = "data/results/experiment_adjoint.csv"
+    adjoint_label = "Adjoint Solution, NRMSE = 16.42"
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+    obs_data, exact_b = load_toy_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+    adjoint_file = "data/results/simulated_noise_adjoint.csv"
+    adjoint_label = "Adjoint Solution, NRMSE = 10.76"
 end
 
 solver = swe_solver(sim_config)
@@ -37,9 +44,9 @@ forward(params) = simulation(params, solver, obs_data)
 
 burnin = 1000
 
-bathy = chain[burnin+1:end,1:mcmc_config.dim]
-lp = chain[burnin+1:end,mcmc_config.dim+1]
-ar = chain[burnin+1:end,end]
+bathy = chain[burnin+1:5000,1:mcmc_config.dim]
+lp = chain[burnin+1:5000,mcmc_config.dim+1]
+ar = chain[burnin+1:5000,end]
 
 println("Acceptance rate after burn-in: ", round(mean(ar), digits=4))
 println("Acceptance rate at the end of the chain: ", round(ar[end], digits=4))
@@ -82,30 +89,49 @@ error_plot = scatter(xs, mean_bathy, yerror=grid_error, label="Mean of last $(si
      ylims=(-0.055,0.21), xlabel=L"x [m]", ylabel=L"b(x) [m]", title="Bathymetry Sample Mean with MCSE Error Bars", grid=true)
 plot!(error_plot, xs, mean_bathy; label=bathy_label, color=Plots.palette(:default)[1])
 plot!(error_plot, xs, exact_b, label="True Bathymetry", color=:black)
+
+if include_adjoint
+    adjoint_bathy = CSV.read(adjoint_file, DataFrame)
+    x_adj = adjoint_bathy.x
+    bathy_adj = adjoint_bathy.b
+    plot!(error_plot, x_adj, bathy_adj, label=adjoint_label, color=:black, linestyle=:dash)
+    appendix = "_adjoint"
+end
+
 scatter!(error_plot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
-savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).png")
-savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin).pdf")
+savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin)$(appendix).png")
+savefig(error_plot, exp*"/plots/mean_bathy_errorbars_$(burnin)$(appendix).pdf")
 println("Store at $(exp*"/plots/mean_bathy_errorbars.png")")
 
 ciplot = plot(xs, exact_b; label="Exact bathymetry", color=:black)
 plot!(ciplot, xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .- mean_bathy),  color=Plots.palette(:default)[1], label="95% Credible Interval",
-    ylims=(-0.05,0.21), xlabel=L"x [m]", ylabel=L"b(x) [m]", title="Bathymetry Sample Mean with 95% Credible Interval", grid=true)
+    ylims=(-0.05,0.21), xlabel=L"x \ [m]", ylabel=L"b(x) \ [m]", grid=true)
 plot!(ciplot, xs, mean_bathy; label=bathy_label, color=Plots.palette(:default)[2])
 
+if include_adjoint
+    adjoint_bathy = CSV.read(adjoint_file, DataFrame)
+    x_adj = adjoint_bathy.x
+    bathy_adj = adjoint_bathy.b
+    plot!(ciplot, x_adj, bathy_adj, label=adjoint_label, color=:black, linestyle=:dash)
+    appendix = "_adjoint"
+end
+
 scatter!(ciplot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
-savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).png")
-savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin).pdf")
-println("Store at $(exp*"/plots/mean_bathy_credible_interval.png")")
+savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin)$(appendix).png")
+savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin)$(appendix).pdf")
+println("Store at $(exp*"/plots/mean_bathy_credible_interval_$(burnin)$(appendix).png")")
 
 sim_chain = forward(mean_bathy)
 
-println("#############################\nCreate sensor simulation plots" )
-rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4).*100
-for i in 2:4
-    psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])%", label="measurement", xlabel=L"t [s]", ylabel=L"H [m]", linestyle=:dash)
-    plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
-    savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).png"))
-    savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).pdf"))
+if plot_sensor_simulation
+    println("#############################\nCreate sensor simulation plots" )
+    rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4).*100
+    for i in 2:4
+        psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])%", label="measurement", xlabel=L"t [s]", ylabel=L"H [m]", linestyle=:dash)
+        plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
+        savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).png"))
+        savefig(psim, joinpath(exp, "plots/sim_chain_sensor_$(i).pdf"))
+    end
 end
 
 println("peak height exp $(exp_bathymetry([4.0]))")
