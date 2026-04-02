@@ -1,3 +1,11 @@
+###############################################################################
+# MCMC reconstruction of bathymetry from water surface height observations    #
+# This script runs multiple MCMC chains in parallel and stores the results    #
+# along with diagnostic plots.                                                #
+#                                                                             #
+#   Author: Lars Stietz                                                       #
+###############################################################################
+
 using Pkg
 Pkg.activate(".")
 #Pkg.instantiate()
@@ -15,11 +23,17 @@ using LinearAlgebra
 @everywhere begin
     using Distributions
     using BathymetryReco
+    using Random
+
+    Random.seed!(161)
 end
 
 ENV["GKSwstype"]="nul"
 
-# Load the configuration
+###############################################################################
+# Load the configuration                                                      #
+###############################################################################
+
 println("#############################\nRead in config file" )
 if isempty(ARGS)
     config_file = abspath("./width_test_configs/config_1.toml")
@@ -32,13 +46,25 @@ config = load_config(toml_config)
 sim_config = config.sim_params
 mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
+prior_settings = mcmc_config.prior
+proposal_settings = mcmc_config.proposal
 io_config = config.io_settings
 
-# Load the data
+###############################################################################
+# Load the observation data                                                   #
+###############################################################################
+
 if obs_config.real_data
-    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval)
+    obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval,
+    sensor_id  = obs_config.sensor_id, noise_var=obs_config.noise_var)
+    exp_type = "heat_tests"
+    if occursin("mean", obs_config.path)
+        exp_type = "heat_tests/mean_tests"
+    end
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+    obs_data, exact_b = load_toy_observation(obs_config.path, obs_config.noise_var,
+    sensor_rate=obs_config.sensor_rate, sensor_id=obs_config.sensor_id)
+    exp_type = "toy_tests"
 end
 
 # create plot of the observation signal
@@ -50,15 +76,27 @@ store_exp = io_config.save
 target_dir = joinpath(io_config.output_dir,
                       "$(exp_name)_$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))")
 
-if store_exp
-    mkpath(target_dir)
-    plot_path = joinpath(target_dir,"plots")
-    mkpath(plot_path)
-    savefig(ps, joinpath(plot_path,"observation_signal.png"))
-end
+# Set up directory for storing results
+store_exp = io_config.save
+exp_name = split(splitpath(obs_config.path)[end], ".")[1]
+# Directory structure for storing results experiment/sensors/prior/proposal/stepsize/timestamp_expname
+target_dir = joinpath(io_config.output_dir,
+                      exp_type,
+                      "sensor-"*join(obs_config.sensor_id, "-"),
+                      "prior-"*join(prior_settings.type,"-"),
+                      "proposal-"*proposal_settings.type,
+                      "stepsize-"*join(string.(mcmc_config.γ),"-"),
+                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
+
+println("Storing results in: $target_dir")
+
+###############################################################################
+# Setup the forward model, likelihood, prior and proposal for MCMC sampling   #
+###############################################################################
 
 @everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
+# define likelihood distribution
 likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
     flat_signal = forward_model(zeros(mcmc_config.dim))
@@ -68,6 +106,7 @@ end
 
 println("Using $(likelihood_σ) std for Likelihood distribution.")
 likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
+
 # define prior distributions
 prior_dist = Vector{Distribution}()
 for (i, prior_type) in enumerate(mcmc_config.prior.type)
@@ -90,31 +129,23 @@ model = MCMCModel(pos, forward_model, obs_data, proposal_dist)
 
 init_θ = mcmc_config.initial_θ
 
-if isempty(init_θ)
-    xg = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=sim_config.nx))
-    #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
-    #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
-    init_θ = [zeros(mcmc_config.dim)]#[bathymetry(xg, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
-    toml_config["sampler"]["init"] = init_θ
-    inip = plot(xg, init_θ[1])
-    savefig(inip, joinpath(plot_path, "initial_parameters.png"))
-end
-println("#############################")
-println(size(init_θ))
-println(typeof(init_θ))
-for i in 1:mcmc_config.n_chains
-    println(init_θ[i])
-end
-println("#############################")
+###############################################################################
+# Run parallel MCMC sampling                                                  #
+###############################################################################
+
 println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#############################" )
 chain = pmap(1:mcmc_config.n_chains) do i
     sample_chain(model, mcmc_config, init_θ[i])
 end
 println("Chains finished \n#############################" )
-println(size(chain))
-println
+
+###############################################################################
+# Store the chains and create diagnostic plots                                #
+###############################################################################
+
 if store_exp
     mkpath(target_dir)
+    mkpath(joinpath(target_dir,"plots"))
     cd(target_dir)
 
     # store the configuration file for reproducibility
@@ -138,9 +169,12 @@ if store_exp
         plot!(plprior, chain[i][:,end-1]; label="$i: log prior") # log prior
         plot!(pla, chain[i][:,end]; label="$i: α") # acceptance rate
     end
-    savefig(pc, "./plots/chain.png")
-    savefig(plp, "./plots/logp.png")
-    savefig(pll, "./plots/loglikelihood.png")
-    savefig(plprior, "./plots/logprior.png")
-    savefig(pla, "./plots/acceptance_rate.png")
+
+    cd("./plots")
+    savefig(ps, "observation_signal.png")
+    savefig(pc, "chain.png")
+    savefig(plp, "logp.png")
+    savefig(pll, "loglikelihood.png")
+    savefig(plprior, "logprior.png")
+    savefig(pla, "acceptance_rate.png")
 end

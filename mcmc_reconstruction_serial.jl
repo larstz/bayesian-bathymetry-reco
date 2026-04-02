@@ -1,3 +1,11 @@
+###############################################################################
+# MCMC reconstruction of bathymetry from water surface height observations    #
+# This script runs multiple MCMC chains in serial and stores the results      #
+# along with diagnostic plots.                                                #
+#                                                                             #
+#   Author: Lars Stietz                                                       #
+###############################################################################
+
 using Pkg
 Pkg.activate(".")
 Pkg.instantiate()
@@ -13,9 +21,16 @@ using LinearAlgebra
 using BathymetryReco
 using ProgressMeter
 
+using Random
+
+Random.seed!(161)
+
 ENV["GKSwstype"]="nul"
 
-# Load the configuration
+###############################################################################
+# Load the configuration                                                      #
+###############################################################################
+
 println("#############################\nRead in config file" )
 if isempty(ARGS)
     config_file = abspath("./configs/configtest.toml")
@@ -28,13 +43,18 @@ config = load_config(toml_config)
 sim_config = config.sim_params
 mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
-io_config = config.io_settings
 prior_settings = mcmc_config.prior
 proposal_settings = mcmc_config.proposal
+io_config = config.io_settings
+
 
 
 println("##############################\nLoad experiment data")
-# Load the data
+
+###############################################################################
+# Load the observation data                                                   #
+###############################################################################
+
 if obs_config.real_data
     obs_data = load_observation(obs_config.path, sim_config.tstart, sim_config.tinterval,
     sensor_id  = obs_config.sensor_id, noise_var=obs_config.noise_var)
@@ -51,7 +71,7 @@ end
 # Set up directory for storing results
 store_exp = io_config.save
 exp_name = split(splitpath(obs_config.path)[end], ".")[1]
-# Directory structure for storing results experiment/sensors/prior/proposal
+# Directory structure for storing results experiment/sensors/prior/proposal/stepsize/timestamp_expname
 target_dir = joinpath(io_config.output_dir,
                       exp_type,
                       "sensor-"*join(obs_config.sensor_id, "-"),
@@ -61,17 +81,16 @@ target_dir = joinpath(io_config.output_dir,
                       "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
 
 println("Storing results in: $target_dir")
-if store_exp
-    mkpath(target_dir)
-    plot_path = joinpath(target_dir,"plots")
-    mkpath(plot_path)
-end
+
 println("#############################")
 
 # create plot of the observation signal
 ps = plot(;title="Observation signal", xlabel="time [s]", ylabel="Water surface height [m]")
 plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in obs_config.sensor_id], 1,length(obs_config.sensor_id)))
 
+###############################################################################
+# Setup the forward model, likelihood, prior and proposal for MCMC sampling   #
+###############################################################################
 
 # define forward model
 solver = swe_solver(sim_config)
@@ -128,29 +147,34 @@ model = MCMCModel(pos, forward_model, obs_data, proposal)
 # Define initial parameters
 init_θ = mcmc_config.initial_θ
 if isempty(init_θ)
-    #init_θ = [vec(vcat(rand.(prior_dist,1)...)) for i in 1:mcmc_config.n_chains]
-    #init_θ = [exp_bathymetry(solver.domain.x) for i in 1:mcmc_config.n_chains]
-    xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
-    init_θ = [bathymetry(xs, [4.5,0.05]) for i in 1:mcmc_config.n_chains]
-    # init_θ[1] .= 0.0 # set first chain to correct bathymetry
-    init_θ[1] .= rand(prior_dist[1]) # set first chain to random sample from prior
+    init_θ = [zeros(mcmc_config.dim) for i in 1:mcmc_config.n_chains]
     toml_config["sampler"]["init"] = init_θ
+    xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
     inip = plot(xs, init_θ[1])
 end
 println("#############################")
 
 println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#############################" )
 
+###############################################################################
+# Run the MCMC sampling                                                       #
+###############################################################################
+
 chains = []
 for i in 1:mcmc_config.n_chains
     chain = sample_chain(model, mcmc_config, init_θ[i], verbose=true, logging=Progress(mcmc_config.n))
     push!(chains, chain)
 end
+
 println("Chains finished \n#############################" )
-println(size(chains))
-println
+
+###############################################################################
+# Store the chains and create diagnostic plots                                #
+###############################################################################
+
 if store_exp
     mkpath(target_dir)
+    mkpath(joinpath(target_dir,"plots"))
     cd(target_dir)
 
     # store the configuration file for reproducibility
@@ -163,6 +187,7 @@ if store_exp
     pla = plot(;title="Chain acceptance rate α", xlabel="Iteration", ylabel="Value", legend=:outerright)
     pll = plot(;title="Chain log likelihood", xlabel="Iteration", ylabel="Value", legend=:outerright)
     plprior = plot(;title="Chain log prior", xlabel="Iteration", ylabel="Value", legend=:outerright)
+
     # Serialize the chain
     for (i, initial_θ) in enumerate(init_θ)
         serialize("chain_$i.jls", chains[i])
@@ -174,6 +199,7 @@ if store_exp
         plot!(plprior, chains[i][:,end-1]; label="$i: log prior") # log prior
         plot!(pla, chains[i][:,end]; label="$i: α") # acceptance rate
     end
+
     cd("./plots")
     savefig(ps, "observation_signal.png")
     savefig(inip, "initial_parameters.png")
