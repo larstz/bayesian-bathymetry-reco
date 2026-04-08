@@ -16,6 +16,6 @@ sensor_position = [3.5, 5.5, 7.5]
 tinterval = 10
 g = 9.81
 tstart = 32
-bc_file = "./data/mean_bc.txt"
+bc_file = "./data/mean_heat_wb.txt"
 
 [bathymetry]

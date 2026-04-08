@@ -5,7 +5,7 @@ using CSV
 using DataFrames
 using Statistics
 
-heats = ["data/experiment_data/without_bathymetry/Heat$(i).txt" for i in 1:20]
+heats = ["data/experiment_data/With_Bathymetry/Heat$(i).txt" for i in 1:20]
 
 data = Array{Float64,3}(undef, 10000, 5, 20)
 keys = Array{String,1}(undef, 5)

@@ -15,7 +15,7 @@ bathymetry = "exact_bathy"
 sensor_position = [3.5, 5.5, 7.5]
 tinterval = 10
 g = 9.81
-bc_file = "./data/mean_bc.txt"
+bc_file = "./data/mean_heat_wb.txt"
 tstart = 32
 
 [observation]
