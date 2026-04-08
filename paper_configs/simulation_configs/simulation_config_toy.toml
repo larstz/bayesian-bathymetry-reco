@@ -1,0 +1,21 @@
+title = "Toy Measurement Setup"
+
+[output]
+save = true
+path = "./data/toy_measurement/paper/"
+
+[simulation]
+xbounds = [1.5, 15.0]
+dealias = 1.5
+scenario = "waterchannel"
+nx = 128
+timestep = 5e-5
+kappa = 0.2
+bathymetry = "exact_bathy"
+sensor_position = [3.5, 5.5, 7.5]
+tinterval = 10
+g = 9.81
+tstart = 32
+bc_file = "./data/mean_heat_wb.txt"
+
+[bathymetry]

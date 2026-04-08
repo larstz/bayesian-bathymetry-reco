@@ -1,23 +1,23 @@
 title = "Toy Measurement Setup"
 
+[output]
+save = false
+path = "./data/toy_measurement/"
+
 [simulation]
 xbounds = [1.5, 15.0]
-timestep = 5e-5
-nx =  128
-tstart = 32 # only used for waterchannel
+dealias = 1.5
+scenario = "waterchannel"
+nx = 130
+timestep = 5.0e-5
+kappa = 0.2
+bathymetry = "exact_bathy"
+sensor_position = [3.5, 5.5, 7.5]
 tinterval = 10
 g = 9.81
-kappa = 0.2
-dealias = 1.5
-sensor_position = [3.5, 5.5, 7.5] # must remain in between xbounds
-scenario = "waterchannel" #supported are waterchannel and periodic
-bathymetry = "gaussian" #supported are exact_bathy and gaussian
-bc_file = "./data/mean_bc.txt"
+bc_file = "./data/experiment_data/with_bathymetry/Heat1.txt"
+tstart = 32
 
 [bathymetry]
-parameters = [4.0, 0.05, 7.0, 0.05]
+parameters = [5.0, 0.5, 10.5, 1.0]
 npeaks = 2
-
-[output]
-save = true
-path = "./data/toy_measurement"

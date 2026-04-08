@@ -14,25 +14,32 @@ scenario = "waterchannel" #supported are waterchannel and periodic
 bc_file = "./test_data/mean_bc.txt"
 bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
 
-[bathymetry] # used to generate toy measurement
-parametrized = true
-parameters = [3.5, 0.5]
-npeaks = 1
-
 [sampler]
 stepsize = [0.1, 0.01]
 likelihood_var = 0.01
 n_samples = 2
-n_chains = 10
+nx= 64
 burn_in = 0
 initial = [[3.5, 0.5], [2.5, 1.5]]
+n_chains = 10
+    [sampler.prior]
+    type = "smooth" # supported are smooth and gaussian
+    lengthscale = 1
+    var = 0.005
+    loc = 0.0
+    scale = 0.1
+    [sampler.proposal]
+    type = "pCN"
+    kernel = "smooth"
+    lengthscale = 1
+    var = 0.005
 
 [observation]
 path = "./data/toy_measurement/waterchannel_exact_bathy"
 real_data = false
 noise_var = 0.05
 sensor_rate = 0.01
-sensor_id = [2, 3, 4] # must remain in between xbounds
+sensor_id = [2, 3, 4] # Sensor IDs to use, must be in [2, 3, 4]
 
 [output]
 save = true

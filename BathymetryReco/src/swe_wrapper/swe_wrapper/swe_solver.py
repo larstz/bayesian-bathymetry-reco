@@ -1,4 +1,3 @@
-from time import time
 import numpy as np
 import dedalus.public as d3
 from scipy import interpolate
@@ -219,8 +218,6 @@ class WaterChannelSolver(Solver):
         solver = problem.build_solver(d3.RK443)
         return solver
 
-#! TODO: Implement left boundary condition
-
 
 class SWESolver():
     """Shallow water equation solver.
@@ -277,15 +274,22 @@ class SWESolver():
         # Set the initial conditions
         self.ic.b['g'] = np.squeeze(b_array)
         self.ic.h['g'] = self.ic.H - self.ic.b['g']
-        self.ic.u['g'] = 0
+        self.ic.u['g'] = 0.0
 
+        self.ic.tau1['g'] = 0.0
+        self.ic.tau2['g'] = 0.0
+        self.ic.bc_field['g'] = 0.0
+        self.ic.t['g'] = 0.0
 
         b_sensor = self.eval_at_sensor_positions(self.ic.b, sensor_pos)
         temph_sensor = self.eval_at_sensor_positions(self.ic.h, sensor_pos) + b_sensor
         self.ic.change_space_scales(1)
         # Set parameters for the solver
+
         solver = self.solver.get_problem()
-        solver.stop_wall_time = 15000
+        solver.sim_time = 0.0
+        solver.iteration = 0
+
         solver.stop_iteration = int(self.total_t/abs(self.dt))
         solver.stop_sim_time = self.total_t #- 1e-13
 
@@ -330,6 +334,6 @@ class SWESolver():
 
         for i, sensor_pos in enumerate(pos):
             sol_int = sol(x=sensor_pos)
-            temp[i] = float(sol_int.evaluate()['g'])
+            temp[i] = sol_int.evaluate()['g'].item()
 
         return temp

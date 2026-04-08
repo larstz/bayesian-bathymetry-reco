@@ -1,0 +1,46 @@
+title = "MH Bathymetry Reco setup - parametrized limit test"
+
+[output]
+save = true
+path = "./data/results/peak-test"
+
+[simulation]
+xbounds = [1.5, 15.0]
+dealias = 1.5
+scenario = "waterchannel"
+nx = 64
+timestep = 0.01
+kappa = 0.2
+bathymetry = "exact_bathy"
+sensor_position = [3.5, 5.5, 7.5]
+tinterval = 10
+g = 9.81
+bc_file = "./data/mean_bc.txt"
+tstart = 32
+
+[observation]
+real_data = false
+sensor_rate = 0.01
+noise_var = 0.05
+sensor_id = [2, 3, 4]
+path = "./data/toy_measurement/waterchannel_gaussian_1_peaks/[1.5, 0.05]"
+
+[sampler]
+stepsize = [0.1, 0.01]
+nx = 2
+likelihood_var = [0.0010582482716088124, 0.0008590028424812122, 0.0006832137634247971]
+n_samples = 2000
+burn_in = 0
+initial = [[2.0, 0.25], [3.0, 0.25], [4.0, 0.25], [5.0, 0.25], [6.0, 0.25], [7.0, 0.25], [8.0, 0.25]]
+n_chains = 7
+    [sampler.prior]
+    type = ["uniform","uniform"] # first entry for position, second for width
+    lengthscale = 2
+    var = 0.005
+    loc = [1.5, 0.0] # defining the mean for normal and lower bound for uniform
+    scale = [12.5, 0.1] # defining the std for normal and upper bound for uniform
+    [sampler.proposal]
+    type = "rw"
+    kernel = ""
+    lengthscale = 2
+    var = 1.0

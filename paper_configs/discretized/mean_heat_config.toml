@@ -1,0 +1,49 @@
+title = "MH Bathymetry Reco setup"
+
+[output]
+save = true
+path = "./data/results/paper_results"
+
+[simulation]
+xbounds = [1.5, 15.0]
+dealias = 1.5
+scenario = "waterchannel"
+nx = 64
+timestep = 0.01
+kappa = 0.2
+bathymetry = "exact_bathy"
+sensor_position = [3.5, 5.5, 7.5]
+tinterval = 10
+g = 9.81
+bc_file = "./data/experiment_data/mean_heat_wb.txt"
+tstart = 32
+
+[observation]
+real_data = true
+sensor_rate = 0.01
+noise_var = 0.0
+sensor_id = [2, 3, 4]
+path = "./data/experiment_data/mean_heat_wb.txt"
+
+[sampler]
+stepsize = [0.001]
+nx = 64
+likelihood_var = 0.0
+n_samples = 5000
+burn_in = 0
+init = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+initial = []
+n_chains = 1
+
+    [sampler.proposal]
+    lengthscale = 2
+    kernel = "smooth"
+    type = "rw"
+    var = 1.0
+
+    [sampler.prior]
+    lengthscale = 2
+    loc = 0.0
+    type = ["smooth", "sparse"]
+    scale = 0.01
+    var = 0.005

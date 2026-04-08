@@ -1,0 +1,48 @@
+title = "MH Bathymetry Reco setup - discretized (one experiment)"
+
+[simulation]
+xbounds = [1.5, 15.0]
+timestep = 1e-2
+nx =  64
+tstart = 32
+tinterval = 10
+g = 9.81
+kappa = 0.2
+dealias = 1.5
+sensor_position = [3.5,5.5,7.5] # must remain in between xbounds
+scenario = "waterchannel" #supported are waterchannel and periodic
+bc_file = "./data/experiment_data/with_bathymetry/Heat1.txt"
+bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
+
+[sampler]
+stepsize = [0.01]
+likelihood_var = 0.0
+n_samples = 2
+nx= 64
+burn_in = 0
+#prior = "Normal{Float64}[Normal{Float64}(μ=4.0, σ=1.0), Normal{Float64}(μ=0.1, σ=0.1)]"
+#[[6.0, 1.0], [5.0, 1.0], [4.0, 1.0], [3.0, 1.0], [2.5, 1.0], [5.5, 1.0], [6.0, 0.1]]
+initial = []
+n_chains = 1
+    [sampler.prior]
+    type = "smooth" # supported are smooth and gaussian
+    lengthscale = 1
+    var = 0.005
+    loc = 0.0
+    scale = 0.1
+    [sampler.proposal]
+    type = "pCN"
+    kernel = "smooth"
+    lengthscale = 1
+    var = 1.0
+
+[observation]
+path = "./data/experiment_data/with_bathymetry/Heat1.txt"
+real_data = true
+noise_var = 0.05
+sensor_rate = 0.01
+sensor_id = [2,3,4] # Sensor IDs to use, must be in [2, 3, 4]
+
+[output]
+save = true
+path = "./data/results/"

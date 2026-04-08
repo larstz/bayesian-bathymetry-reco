@@ -1,0 +1,48 @@
+title = "MH Bathymetry Reco setup - parametrized"
+
+[simulation]
+xbounds = [1.5, 15.0]
+timestep = 1e-2
+nx =  64
+tstart = 32
+tinterval = 10
+g = 9.81
+kappa = 0.2
+dealias = 1.5
+sensor_position = [3.5,5.5,7.5] # must remain in between xbounds
+scenario = "waterchannel" #supported are waterchannel and periodic
+bc_file = "./data/mean_bc.txt"
+bathymetry = "exact_bathy" #supported are exact_bathy and gaussian
+
+[sampler]
+stepsize = [0.05, 0.005]
+likelihood_var = 0.0
+n_samples = 2
+nx = 2
+burn_in = 0
+initial = [[6.0, 0.5], [5.0, 0.5], [4.0, 0.5], [3.0, 0.5], [2.5, 0.5], [5.5, 0.5]]
+n_chains = 6
+    [sampler.prior]
+    type = ["normal","uniform"] # first entry for position, second for width
+    lengthscale = 2
+    var = 0.005
+    loc = [4.0,0.001] # defining the mean for normal and lower bound for uniform
+    scale = [0.1, 0.1] # defining the std for normal and upper bound for uniform
+    [sampler.proposal]
+    type = "rw"
+    kernel = ""
+    lengthscale = 2
+    var = 1.0
+
+
+[observation]
+#path = "./data/experiment_data/Heat1.txt"
+path = "./data/toy_measurement/waterchannel_exact_bathy/"
+real_data = false
+noise_var = 0.05
+sensor_rate = 0.01
+sensor_id = [2,3,4] # Sensor IDs to use, must be in [2, 3, 4]
+
+[output]
+save = true
+path = "./data/results/parametrized/"

@@ -3,11 +3,14 @@ Pkg.activate(".")
 using TOML
 using HDF5
 using BathymetryReco
+using Distributions
+using Plots
+using DataInterpolations
 
 cd(@__DIR__)
 
 #TODO pass config file as command line argument
-config_file = abspath("simulation_config.toml")
+config_file = ARGS[1]
 config = TOML.parsefile(config_file)
 sim_config = read_simulation_parameters(config["simulation"])
 
@@ -42,6 +45,13 @@ if problem_bathy == "gaussian"
     end
 elseif  problem_bathy == "exact_bathy"
     global bathy = exp_bathymetry(x)
+elseif problem_bathy == "random"
+    kernel = SqExpMvNormal(nx, 4, 0.005)
+    bathy_dist = MvNormal(kernel)
+    equi_x = collect(range(xbounds[1], xbounds[2], nx))
+    sample_bathy = rand(bathy_dist)
+    global pb = plot(equi_x, sample_bathy, label="sample bathymetry")
+    global bathy = PCHIPInterpolation(sample_bathy, equi_x)(x)
 else
     println("Requested bathymetry type not available")
 end
@@ -61,12 +71,22 @@ if io_config.save
     if problem_bathy == "gaussian"
         sim_name *= "_$(npeaks)_peaks"
     end
+
     sim_path = joinpath(path,sim_name)
-    sim_details_path = joinpath(sim_path, "$bathy_params")
     mkpath(sim_path)
     cd(sim_path)
-    mkpath(sim_details_path)
-    cd(sim_details_path)
+
+    if problem_bathy == "gaussian"
+        sim_details_path = "$bathy_params"
+        sim_details_path = "$bathy_params"
+        mkpath(sim_details_path)
+        cd(sim_details_path)
+        savefig(pb, "sample_bathymetry.png")
+        savefig(pb, "sample_bathymetry.pdf")
+    end
+
+    println("Storing results in: $(pwd())")
+
     h5open("jl_simulation_data.h5", "w") do file
         file["h"] = h_array
         file["u"] = u_array

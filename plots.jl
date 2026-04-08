@@ -3,29 +3,22 @@ Pkg.activate(".")
 
 using BathymetryReco
 using Plots
-using DataFrames
 using Statistics
 using Serialization
 using Dates
 using LaTeXStrings
 using Measures
 using Printf
+using MCMCChains
+using CSV
+using DataFrames
 
-width_cm = 18/4
-height_cm = 9/4
-function cm2px(size)
-    dpi = 300
-    return (size[1] * dpi / 2.54, size[2] * dpi / 2.54)
-end
-
-gr()
-default(dpi=300, size=cm2px((width_cm, height_cm)), widen=false, margin=5mm, labelfontsize=12, tickfontsize=12, legendfontsize=12)
+include("my_theme.jl")
+theme(:custom)
 ticks1dec(x) = @sprintf("%.1f", x)
 #default(size=(0.25*0.75*600, 0.25*400))
-date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
 experiment = ARGS[1]
-exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
 println("Creating plots for experiment: ", experiment)
 config = load_config(joinpath(experiment, "experiment_config.toml"))
 sim_config = config.sim_params
@@ -33,7 +26,7 @@ mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
 io_config = config.io_settings
 
-plot_chains = false
+plot_chains = true
 plot_bathys = true
 
 # Load the data
@@ -42,7 +35,7 @@ if obs_config.real_data
     x = Vector(LinRange(sim_config.xbounds[1], sim_config.xbounds[2], sim_config.nx))
     exact_b = exp_bathymetry(x)
 else
-    obs_data, exact_b = load_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
+    obs_data, exact_b = load_toy_observation(obs_config.path, obs_config.noise_var, sensor_rate=obs_config.sensor_rate)
     x = obs_data.sim_x
 end
 
@@ -51,34 +44,18 @@ files = readdir(experiment)
 chains = filter(x -> occursin(r"chain_[0-9]+.jls", x), files)
 n_chains = length(chains)
 samples = [deserialize(joinpath(experiment, file)) for file in chains]
-burn_in = 250
-
-# sampled 2σ² instead of σ², so we need to convert it, adjusted after 2025-06-25
-if exp_date < Date(2025,6,25)
-    setindex!.(samples, 0.5 .* getindex.(samples, :, 2), :,2)
-end
+burn_in = 200
 
 sample_mean = mean.(samples, dims=1)
 samples_mat = hcat(samples...)
 
 stored_vals = Int64(size(samples_mat, 2)/n_chains)
-param_names = ["\\mu", "\\sigma^2", "lp", "ar"]
+param_names = ["\\mu", "\\sigma^2", "lpost", "ll", "lprior","ar"]
+chain_param = [:mu, :sigma2, :lpost, :ll, :lprior, :ar]
+chain_internals = [:lpost, :ll, :lprior, :ar]
+chain_array = reshape(samples_mat[burn_in+1:end, :], (:, stored_vals, n_chains))
 
-plot_size = (960,400)
-
-function chains2df(chains)
-    # Convert the chains to a DataFrame
-    df = DataFrame()
-    i = 1
-    for chain in chains
-        n_params = size(chain, 2) - 1
-        nms = vcat([Symbol("param_$(j)_c_$(i)") for j in 1:n_params]..., Symbol("lp_c_$(i)"))
-        chain_df = DataFrame(chain, nms)
-        df = hcat(df, chain_df)# leftjoin!(df, chain_df)
-        i += 1
-    end
-    return df
-end
+mcmc_chains = Chains(chain_array, chain_param, Dict(:internals => chain_internals))
 
 # everything should be loaded now create the plots
 plot_path = joinpath(experiment, "plots")
@@ -112,29 +89,50 @@ if plot_bathys
         burnin_chain = chain[burn_in+1:end, :]
         bathys = zeros(size(burnin_chain)[1], length(exact_b))
         for (i, sample) in enumerate(eachrow(burnin_chain))
-            bathys[i, :] = bathymetry(x, sample[1:end-2])
+            bathys[i, :] = bathymetry(x, sample[1:end-4])
         end
-        #bathy_mean = vec(mean(bathys, dims=1))
-        mean_params = vec(mean(burnin_chain[:, 1:end-2], dims=1))
-        #rel_l2_error_mean = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
+        bathy_mean = vec(mean(bathys, dims=1))
+        mean_params = vec(mean(burnin_chain[:, 1:end-4], dims=1))
         rel_l2_error = round.(sqrt(sum((bathymetry(x, mean_params) .- exact_b).^2)) ./ sqrt(sum((exact_b).^2))*100, digits=2)
-        #nrmse = sqrt(mean(bathymetry(x, mean_params) .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b))
-        pb = plot(x, exact_b; c=:black, xlabel="x [m]", ylabel="b(x) [m]", label="Exact bathymetry", xlim=(1.5,12))
+
+        pb = plot(x, exact_b; c=:black, xlabel=L"x \ [m]", ylabel=L"b(x) \ [m]", label="Exact bathymetry", xlim=(1.5,12))
         plot!(pb, x, bathys'; label=permutedims(vcat([latexstring("b(x; \\mu_i, \\sigma^2_i),\\ i \\in [n]")], repeat([""], size(bathys)[1]))), alpha=0.1, lw=0.25, color=:gray)
         #plot!(pb, x, bathy_mean; c=:red, label="sample mean, ε=$(rel_l2_error_mean)")
         plot!(pb, x, bathymetry(x, mean_params); c=:blue, label=latexstring("b(x; \\bar{\\mu},\\bar{\\sigma}^2),\\ \\varepsilon_\\mathrm{L2}=$(rel_l2_error)\\%"))
         yaxis!(pb, yticks=0.0:0.05:0.5)
         xaxis!(pb, xticks=2:2:12)
         # to display error use bars from quantiles
-        savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx).png"))
-        savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx).pdf"))
+
+        savefig(pb, joinpath(plot_path, "pngs", "bathy_chain_$(idx)_bi_$(burn_in).png"))
+        savefig(pb, joinpath(plot_path, "pdfs", "bathy_chain_$(idx)_bi_$(burn_in).pdf"))
+
+        mcmc_bathy = Chains(bathys)
+        ci_low = hpd(mcmc_bathy)[:, :lower]
+        ci_high = hpd(mcmc_bathy)[:, :upper]
+        bathy_l2 = round.(sqrt(sum((bathy_mean .- exact_b).^2)) / sqrt(sum((exact_b).^2)), digits=4)
+        bathy_linf = maximum(abs.(bathy_mean .- exact_b))/maximum(exact_b)*100
+        bathy_nrmse = (sqrt(mean(bathy_mean .- exact_b).^2) / (maximum(exact_b) - minimum(exact_b)))*100
+
+        metrics_dict = Dict("NRMSE" => bathy_nrmse,
+                    "rL2" => bathy_l2,
+                    "rLinf" => bathy_linf)
+        metrics_df = DataFrame(metrics_dict)
+        metrics_file = joinpath(experiment, "metrics_$(idx)_$(burn_in).csv")
+        CSV.write(metrics_file, metrics_df)
+
+        ciplot = plot(x, exact_b; label="Exact bathymetry", color=:black, ylims=(-0.01,0.21), xlabel=L"x \ [m]", ylabel=L"b(x) \ [m]")
+        plot!(ciplot, x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean),  color=Plots.palette(:default)[1], label="95% Credible Interval")
+        plot!(ciplot, x, bathy_mean;   color=Plots.palette(:default)[2], label=latexstring("b_i, \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))"))
+        scatter!(ciplot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
+        savefig(ciplot, joinpath(plot_path, "pngs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).png"))
+        savefig(ciplot, joinpath(plot_path, "pdfs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).pdf"))
 
         # Plot the sensor simulation
         sim_chain = simulation(mean_params, sim_config, obs_data)
 
         rel_l2_sim_error = round.(sqrt.(sum((sim_chain .- obs_data.H).^2, dims=1)) ./ sqrt.(sum((obs_data.H).^2, dims=1)), digits=4)
         for i in 2:4
-            psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel="t [s]", ylabel="H [m]", linestyle=:dash)
+            psim = plot(obs_data.t, obs_data.H[:,i-1]; title="Sensor $i, ε=$(rel_l2_sim_error[i-1])", label="measurement", xlabel=L"t \ [s]", ylabel=L"H \ [m]", linestyle=:dash)
             plot!(psim, obs_data.t, sim_chain[:,i-1]; label="simulation ", linestyle=:dot, linewidth=2)
             savefig(psim, joinpath(plot_path, "pngs", "sim_chain_$(idx)_sensor_$(i).png"))
             savefig(psim, joinpath(plot_path, "pdfs", "sim_chain_$(idx)_sensor_$(i).pdf"))
