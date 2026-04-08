@@ -17,7 +17,7 @@ println("Added $(nworkers()) workers.")
     using BathymetryReco
 end
 
-config_file = abspath("configs/paper_configs/parametrized/experiment_config.toml")
+config_file = abspath("paper_configs/parametrized/experiment_config.toml")
 toml_config = TOML.parsefile(config_file)
 config = load_config(toml_config)
 sim_config = config.sim_params
