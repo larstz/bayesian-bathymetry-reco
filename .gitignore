@@ -10,12 +10,14 @@ data
 *.log
 LocalPreferences.toml
 !BathymetryReco/test/test_data/*
-config_*
-!configs/*
+configs/*
+!paper_configs/parametrized/peak_test/
+!paper_configs/parametrized/width_test/
+*_test_configs/
 plots
 bananatest.jl
 suggested_priors.jl
 advection_example/advection_notebook.jl
 *.pdf
-BathymetryReco/src/swe_wrapper/swe_wrapper/build/*
+BathymetryReco/src/swe_wrapper/build/*
 slurm*
