@@ -450,8 +450,8 @@ export read_bathymetry_parameters
 Read the bathymetry parameters from a dictionary (parsed from a TOML file) and return a `BathymetrySetup` struct containing the bathymetry parameters.
 """
 function read_bathymetry_parameters(config::Dict{String,Any})
-    params = config["parameters"]
-    npeaks = config["npeaks"]
+    params = get(config, :parameters, [])
+    npeaks = get(config, :n_peaks, 0)
     bathy_params = BathymetrySetup(params, npeaks)
     return bathy_params
 end

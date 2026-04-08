@@ -76,7 +76,7 @@ target_dir = joinpath(io_config.output_dir,
                       exp_type,
                       "sensor-"*join(obs_config.sensor_id, "-"),
                       "prior-"*join(prior_settings.type,"-"),
-                      "proposal-"*proposal_settings.type,
+                      "proposal-"*proposal_settings.type * "-" * proposal_settings.kernel,
                       "stepsize-"*join(string.(mcmc_config.γ),"-"),
                       "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
 

@@ -8,18 +8,29 @@ using Serialization
 using Dates
 using LaTeXStrings
 using MCMCChains
-using Plots
+using CairoMakie
 
-include("my_theme.jl")
-theme(:custom)
+
+pt_per_unit = 1
+figsize = (390, round(Int, 390*0.618))
 
 # Half size with no whitespace
-half_width = textwidth / 2
-half_height = plot_height/1.5
+half_width = figsize[1] / 2
+half_height = figsize[2] / 1.5
 plot_size = (half_width, half_height)
+
+set_theme!(theme_latexfonts(),
+            fontsize=12,
+            size=plot_size,
+            linewidth=1,
+            markersize=4,
+            figure_padding=5,
+            colormap = :tab10,
+            colorrange = (1, 10))
 
 experiment = ARGS[1]
 chain_list = String[]
+configs = String[]
 for (exp,_, files) in walkdir(experiment)
     if rstrip(splitdir(exp)[1], '/') == rstrip(experiment, '/')
         append!(chain_list,joinpath.(exp,filter(x -> occursin(r"chain_[0-9]+.jls", x), files)))
@@ -77,36 +88,46 @@ title = ""
 include_title = false
 if occursin("width_test", experiment)
     target = s2_targets
-    xlabel = "target " * latexstring("b_w")
-    mutarget = "target "*latexstring("b_p=4.0")
-    s2target = "target "*latexstring("b_w")
+    xlabel = L"target $b_w$"
+    mutarget = L"target $b_p=4.0$"
+    s2target = L"target $b_w$"
     extension = "width"
     if include_title
-        title = "Target "*latexstring("b_w")*" vs reconstructed "*latexstring("b_w")
+        title = L"Target $b_w$ vs reconstructed $b_w$"
     end
-    legend_position = [:bottomright, :topleft]
+    legend_position = [:rb, :lt]
+    ylims_m = (-1, 1)
+    ylims_s = (-0.05, 0.25)
 else
     target = mu_targets
-    xlabel = "target " * latexstring("b_p")
-    mutarget = "target "*latexstring("b_p")
-    s2target = "target "*latexstring("b_w=0.05")
+    xlabel = L"target $b_p$"
+    mutarget = L"target $b_p$"
+    s2target = L"target $b_w=0.05$"
     extension = "position"
     if include_title
-        title = "Target "*latexstring("b_p")*" vs reconstructed "*latexstring("b_p")
+        title = L"Target $b_p$ vs reconstructed $b_p$"
     end
-    legend_position = [:topleft, :bottomleft]
+    legend_position = [:rb, :lt]
+    ylims_m = (-1, 1)
+    ylims_s = (-0.05, 0.25)
 end
 
-pm = plot(target, zeros(length(mu_targets)), label=mutarget, color=:brown4, linewidth=0.75,
-title=title, xlabel=xlabel, ylabel="reco - target " * latexstring("b_p"),
-size=plot_size, margin=0Plots.mm, ylims=(-1, 1))
-plot!(target, mu_means.-mu_targets, seriestype=:scatter, yerror=mu_error, label="reco " * latexstring("b_p"), color=palette(:default)[1])
-plot!(pm, legend_position=:bottomleft)
+figm = Figure()
+axm = Axis(figm[1,1], title=title, xlabel=xlabel, ylabel=L"(reco-target) $b_p$", yticks=-1:0.5:1)
+ylims!(axm, ylims_m...)
 
-ps = plot(target, zeros(length(s2_targets)), label=s2target, color=:brown4, linewidth=0.75,
- title=title, xlabel=xlabel, ylabel="reco - target " * latexstring("b_w"), size=plot_size, margin=0Plots.mm, ylims=(-0.1, 0.1))
-scatter!(target, s2_means.-s2_targets, yerror=s2_error, label="reco " * latexstring("b_w"), color=palette(:default)[1])
-plot!(ps, legend_position=:bottomleft)
+lines!(axm, target, zeros(length(target)), color = 4, colormap = :tab10, colorrange = (1, 10))
+errorbars!(axm, target, (mu_means.-mu_targets), mu_error, color=:black, whiskerwidth=6)
+scatter!(axm, target, (mu_means.-mu_targets), color = 1, colormap = :tab10, colorrange = (1, 10), marker=Circle)
+#axislegend(axm, position=legend_position[1],padding=1)
 
-savefig(pm, joinpath(experiment, "mu_means_mcse_tex_$(extension).pdf"))
-savefig(ps, joinpath(experiment, "s2_means_mcse_tex_$(extension).pdf"))
+figs = Figure()
+axs = Axis(figs[1,1], title=title, xlabel=xlabel, ylabel=L"(reco - target) $b_w$", yticks=-0.1:0.05:0.25)
+ylims!(axs, ylims_s...)
+lines!(axs, target, zeros(length(target)), color = 4, colormap = :tab10, colorrange = (1, 10))
+errorbars!(axs, target, (s2_means.-s2_targets), s2_error, color=:black, whiskerwidth=6)
+scatter!(axs, target, (s2_means.-s2_targets),color = 1, colormap = :tab10, colorrange = (1, 10), marker=Circle)
+#axislegend(axs, position=legend_position[2], padding=1)
+
+save(joinpath(experiment, "mu_means_mcse_$(extension)_makie_nolegend.pdf"), figm; pt_per_unit)
+save(joinpath(experiment, "s2_means_mcse_$(extension)_makie_nolegend.pdf"), figs; pt_per_unit)

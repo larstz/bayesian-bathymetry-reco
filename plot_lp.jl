@@ -6,6 +6,7 @@ using CairoMakie
 using Serialization
 using LaTeXStrings
 using Distributions
+using BathymetryReco
 
 pt_per_unit = 1
 figsize = (390, round(Int, 390*0.618))
@@ -27,7 +28,7 @@ function common_colorrange(mats...)
     mins = Float64[]
     maxs = Float64[]
     for mat in mats
-        mat_min, mat_max = finite_minmax(mat)
+        mat_min, mat_max = finite_minmax(mat[:, 1:50])
         println("Matrix min: ", mat_min, " max: ", mat_max)
         push!(mins, mat_min)
         push!(maxs, mat_max)
@@ -38,7 +39,7 @@ end
 println("Read in data from disk")
 
 cwd = pwd()
-lp_experiment = ARGS[1]
+lp_experiment = "data/results/lp_scan/lp_scan_2026-04-07-09-43-57/"#ARGS[1]
 
 test_prior = true
 
@@ -60,11 +61,11 @@ lp_mat = permutedims(reshape(lps, length(σs), length(μs)))./scale_vals
 #replace -Inf with NaN
 lp_mat[lp_mat .== -Inf] .= NaN
 ll_mat = permutedims(reshape(lls, length(σs), length(μs)))./scale_vals
-pr_mat = permutedims(reshape(prs, length(σs), length(μs)))
 
-priors = [[Uniform(1.5, 12.5), Uniform(0.001, 1.0)],
-          [Normal(4.0, 0.1), Uniform(0.001, 1.0)],
-          [Normal(4.0, 0.05), Normal(0.05, 0.01)]]
+priors = [[Uniform(1.5, 12.5), Uniform(0.0, 1.0)],
+          [Normal(4.0, 0.1), Uniform(0.0, 1.0)],
+          [Normal(4.0, 0.01), Uniform(0.0, 1.0)]]
+
 lp_test_mats = []
 if test_prior
     for prior in priors
@@ -74,6 +75,8 @@ if test_prior
         push!(lp_test_mats, lp_test_mat)
     end
 end
+
+max_lps = [findmax(lpt) for lpt in lp_test_mats]
 
 common_cr = test_prior ? common_colorrange(lp_mat, ll_mat, lp_test_mats...) : common_colorrange(lp_mat, ll_mat)
 levels = range(common_cr[1], common_cr[2], length=50)
@@ -129,27 +132,44 @@ if length(ARGS) == 2
     n_chains = length(chains)
     samples = [deserialize(joinpath(chain_experiment, file)) for file in chains]
 
+    config = load_config(joinpath(chain_experiment, "experiment_config.toml"))
+    prior_settings = config.mcmc_params.prior
+
+    prior_dist = Vector{Distribution}()
+    for (i, prior_type) in enumerate(prior_settings.type)
+        prior_param = [prior_settings.loc[i], prior_settings.scale[i]]
+        if prior_type == "normal"
+            push!(prior_dist, Normal(prior_param...))
+        elseif prior_type == "uniform"
+            push!(prior_dist, Uniform(prior_param...))
+        else
+            error("Unsupported prior type: $prior_type")
+        end
+    end
+
+    plot_id = findfirst(x->x == prior_dist, priors)
+    f_chn = test_plots[plot_id][1]
     println("Plot the MCMC samples")
     for (i,chain) in enumerate(samples)
         μ = chain[:, 1]
         σ = chain[:, 2]
-        scatter!(axpr, μ[1], σ[1], color=line_colors[i], markersize=5)
-        lines!(axpr, μ, σ, color=line_colors[i], linewidth=2)
+        scatter!(f_chn.content[1], μ[1], σ[1], color=line_colors[i], markersize=5)
+        lines!(f_chn.content[1], μ, σ, color=line_colors[i], linewidth=2)
     end
 
     println("Plotting max posterior")
-    _, idmax = findmax(lps)
+    _, idmax = max_lps[plot_id]
     println("Max Posterior: ", idmax)
-    max_p = p_grid[:, idmax]
+    max_p = [μs[idmax[1]], σs[idmax[2]]]
     println("Max Posterior: ", max_p)
-    scatter!(axpr, max_p[1], max_p[2], color=:black, markersize=5)
+    scatter!(f_chn.content[1], max_p[1], max_p[2], color=:black, markersize=5)
     chain_elem = [LineElement(color=line_colors[i], linestyle=nothing,
         linepoints=Point2f[(0, i/(n_chains+1)), (1, i/(n_chains+1))]) for i in 1:n_chains]
     max_elem = MarkerElement(color=:black, marker=:circle, markersize=5)
-    axislegend(axpr, [chain_elem, max_elem], ["Chains", "Max Posterior"])
+    axislegend(f_chn.content[1], [chain_elem, max_elem], ["Chains", "Max Posterior"])
 
     cd(chain_experiment)
 
-    save("log_posterior_with_chains.png", fpr)
-    save("log_posterior_with_chains.pdf", fpr; pt_per_unit)
+    save("log_posterior_with_chains.png", f_chn)
+    save("log_posterior_with_chains.pdf", f_chn; pt_per_unit)
 end

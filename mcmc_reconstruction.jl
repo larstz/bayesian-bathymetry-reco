@@ -78,7 +78,6 @@ target_dir = joinpath(io_config.output_dir,
 
 # Set up directory for storing results
 store_exp = io_config.save
-exp_name = split(splitpath(obs_config.path)[end], ".")[1]
 # Directory structure for storing results experiment/sensors/prior/proposal/stepsize/timestamp_expname
 target_dir = joinpath(io_config.output_dir,
                       exp_type,

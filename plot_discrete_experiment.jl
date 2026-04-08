@@ -83,7 +83,7 @@ grid_ci_high = hpd(mcmc_chain)[:, :upper]
 result_df = DataFrame(x=xs, mean_bathy=mean_bathy, ci_low=grid_ci_low, ci_high=grid_ci_high, mcse=grid_error)
 CSV.write(joinpath(exp, "bathy_statistics_$(burnin).csv"), result_df)
 
-bathy_label = latexstring("\\bar{b}_i, \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))")
+bathy_label = latexstring("b_i, \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))")
 
 error_plot = scatter(xs, mean_bathy, yerror=grid_error, label="Mean of last $(size(bathy)[1]-burnin) samples",
      ylims=(-0.055,0.21), xlabel=L"x [m]", ylabel=L"b(x) [m]", title="Bathymetry Sample Mean with MCSE Error Bars", grid=true)

@@ -10,7 +10,7 @@ using DataInterpolations
 cd(@__DIR__)
 
 #TODO pass config file as command line argument
-config_file = abspath("simulation_config.toml")
+config_file = ARGS[1]
 config = TOML.parsefile(config_file)
 sim_config = read_simulation_parameters(config["simulation"])
 
@@ -57,7 +57,7 @@ else
 end
 
 println("Start Simulation")
-H_sensor_mean, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=sim_config.sensor_pos)
+H_sensor, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=sim_config.sensor_pos)
 println("Simulation Done")
 dx = (xbounds[2]-xbounds[1])/nx
 
@@ -71,14 +71,22 @@ if io_config.save
     if problem_bathy == "gaussian"
         sim_name *= "_$(npeaks)_peaks"
     end
+
     sim_path = joinpath(path,sim_name)
-    sim_details_path = "$bathy_params"
     mkpath(sim_path)
     cd(sim_path)
-    mkpath(sim_details_path)
-    cd(sim_details_path)
-    savefig(pb, "sample_bathymetry.png")
-    savefig(pb, "sample_bathymetry.pdf")
+
+    if problem_bathy == "gaussian"
+        sim_details_path = "$bathy_params"
+        sim_details_path = "$bathy_params"
+        mkpath(sim_details_path)
+        cd(sim_details_path)
+        savefig(pb, "sample_bathymetry.png")
+        savefig(pb, "sample_bathymetry.pdf")
+    end
+
+    println("Storing results in: $(pwd())")
+
     h5open("jl_simulation_data.h5", "w") do file
         file["h"] = h_array
         file["u"] = u_array

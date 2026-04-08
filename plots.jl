@@ -17,10 +17,8 @@ include("my_theme.jl")
 theme(:custom)
 ticks1dec(x) = @sprintf("%.1f", x)
 #default(size=(0.25*0.75*600, 0.25*400))
-date_pattern = r"(\d{4}-\d{2}-\d{2})"
 
 experiment = ARGS[1]
-exp_date = Date(match(date_pattern, experiment).match, DateFormat("Y-mm-dd"))
 println("Creating plots for experiment: ", experiment)
 config = load_config(joinpath(experiment, "experiment_config.toml"))
 sim_config = config.sim_params
@@ -48,11 +46,6 @@ n_chains = length(chains)
 samples = [deserialize(joinpath(experiment, file)) for file in chains]
 burn_in = 200
 
-# sampled 2σ² instead of σ², so we need to convert it, adjusted after 2025-06-25
-if exp_date < Date(2025,6,25)
-    setindex!.(samples, 0.5 .* getindex.(samples, :, 2), :,2)
-end
-
 sample_mean = mean.(samples, dims=1)
 samples_mat = hcat(samples...)
 
@@ -60,7 +53,7 @@ stored_vals = Int64(size(samples_mat, 2)/n_chains)
 param_names = ["\\mu", "\\sigma^2", "lpost", "ll", "lprior","ar"]
 chain_param = [:mu, :sigma2, :lpost, :ll, :lprior, :ar]
 chain_internals = [:lpost, :ll, :lprior, :ar]
-chain_array = reshape(samples_mat[250+1:end, :], (:, stored_vals, n_chains))
+chain_array = reshape(samples_mat[burn_in+1:end, :], (:, stored_vals, n_chains))
 
 mcmc_chains = Chains(chain_array, chain_param, Dict(:internals => chain_internals))
 
@@ -129,7 +122,8 @@ if plot_bathys
 
         ciplot = plot(x, exact_b; label="Exact bathymetry", color=:black, ylims=(-0.01,0.21), xlabel=L"x \ [m]", ylabel=L"b(x) \ [m]")
         plot!(ciplot, x, bathy_mean, ribbon=(bathy_mean .- ci_low, ci_high .- bathy_mean),  color=Plots.palette(:default)[1], label="95% Credible Interval")
-        plot!(ciplot, x, bathy_mean;   color=Plots.palette(:default)[2], label=latexstring("\\bar{b}(x;\\hat{b}^{(i)}_p, \\hat{b}^{(i)}_w) \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))"))
+        plot!(ciplot, x, bathy_mean;   color=Plots.palette(:default)[2], label=latexstring("b_i, \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))"))
+        scatter!(ciplot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
         savefig(ciplot, joinpath(plot_path, "pngs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).png"))
         savefig(ciplot, joinpath(plot_path, "pdfs", "mean_bathy_credible_interval_$(idx)_bi_$(burn_in).pdf"))
 
