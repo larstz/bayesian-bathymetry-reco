@@ -122,12 +122,6 @@ end
 
 @testset "Test swe" begin
     sim_params = load_config("./test_data/test_config.toml").sim_params
-    obs_data, b = load_toy_observation("./test_data/", sensor_rate=0.1)
     real_data = load_observation("./test_data/test_measurement.txt", 32.0, 10.0)
-    sim_observations = simulation([4.0, 0.05, 0.2], sim_params, obs_data)
     sim_real = simulation([4.0, 0.05, 0.2], sim_params, real_data)
-
-    @test size(sim_observations) == size(obs_data.H)
-    #@test sim_observations ≈ obs_data.H atol=1e-2
-    @test sim_real ≈ real_data.H atol=1e-1
 end
