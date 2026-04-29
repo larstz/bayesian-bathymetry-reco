@@ -124,4 +124,7 @@ end
     sim_params = load_config("./test_data/test_config.toml").sim_params
     real_data = load_observation("./test_data/test_measurement.txt", 32.0, 10.0)
     sim_real = simulation([4.0, 0.05, 0.2], sim_params, real_data)
+
+    @test size(sim_observations) == size(obs_data.H)
+    @test sim_real ≈ real_data.H atol=1e-1
 end
