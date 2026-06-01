@@ -161,6 +161,7 @@ export logjoint
     logjoint(model::MCMCModel, θ)
 
 Compute the log joint probability of parameters `θ` given the `MCMCModel`.
+Returns log_posterior, log_likelihood, log_prior.
 """
 function logjoint(model::MCMCModel, θ)
     log_prior = sum(logprior(model.posterior, θ))
@@ -201,7 +202,7 @@ function sample_chain(
     burn_in = 0,
 )
     chain = zeros(n - burn_in + 1, length(initial_θ) + 4)
-    θ = initial_θ
+    θ = initial_θ 
     lpost, ll, lp = logjoint(model, θ)
     chain[1, :] = [θ..., lpost, ll, lp, 1.0]
     acceptance_rate = 1.0
@@ -246,4 +247,175 @@ function sample_chain(model::MCMCModel, setup::MCMCSetup, initial_θ; kargs...)
         burn_in = setup.burn_in,
         kargs...,
     )
+end
+
+
+export transitional_mcmc
+"""
+    transitional_mcmc(model::MCMCModel, n, initial_θ; verbose=false, logging=Progress(n), burn_in=0)
+
+Run the Transitional MCMC algorithm for a given `MCMCModel`, number of
+samples `n`, and initial parameters `initial_θ`.
+"""
+function transitional_mcmc(
+    model::MCMCModel,
+    n,
+    initial_θ;
+    verbose = false,
+    logging = Progress(n),
+    burn_in = 0,
+    )
+
+    # additional parameter - has nothing to do with other β apparently
+    tmcmc_β = 0.2       # adapted from UncertaintyQuantification.jl/src/modelupdating/bayesianupdating.jl
+    
+    # initialize
+    covariance_method = LinearShrinkage(DiagonalUnitVariance(), :lw)
+    j = 0           # iteration counter
+    β_j = 0.0        # tempering coefficient
+    @assert size(initial_θ,1) == n "initial_θ must be of size n × num_parameters"
+    θ_j = copy(initial_θ)
+
+    # initial eval
+    stats = logjoint.([model], eachrow(θ_j))
+    ll_j, lp_j = zeros(n), zeros(n)
+    for (i,s) in enumerate(stats)
+        #lpostvec[i] = s[1]
+        ll_j[i] = s[2]
+        lp_j[i] = s[3]
+    end
+
+    #
+    S = 0.0
+    while β_j < 1
+        j += 1
+        (verbose) && print("step $(j) - current β=$(β_j)! \n")
+
+        # resample new beta
+        adjust = maximum(ll_j)
+        β_j⁺, w_j = _beta_and_weights(β_j, ll_j .- adjust)
+
+        S += (log(Statistics.mean(w_j)) + (β_j⁺ - β_j) * adjust)
+        weights = StatsBase.FrequencyWeights(w_j ./ sum(w_j))
+        idx = StatsBase.sample(collect(1:(n)), weights, n; replace=true)
+        θ_j⁺ = θ_j[idx, :]
+        Cov_j = tmcmc_β^2 * cov(covariance_method, θ_j, weights)
+
+        # Run inner MH algorithm
+        chain = Vector{Matrix}(undef, burn_in + 2)
+        chain[1] = copy(θ_j⁺)
+
+        old_target = ll_j .* β_j⁺ .+ lp_j
+
+        (verbose) && print("step $(j) - start chain! \n")
+        for i in 2:(burn_in + 2)
+            candidate = copy(chain[i - 1])
+
+            for (j, x) in enumerate(eachrow(candidate))
+                candidate[j, :] = rand(MvNormal(collect(x), Cov_j))
+            end
+
+            # safeguard for Inf in the prior
+            if (model.posterior isa Posterior) || (length(model.posterior) == 1)
+                idx_inf = findall(isinf, logprior.([model.posterior],eachrow(candidate)))
+            else
+                @error("Safeguard for multi distribution prior not implemented yet!")
+            end
+
+            while !isempty(idx_inf)
+                for (j, x) in zip(idx_inf, (eachrow(chain[i - 1][idx_inf,:])))
+                    candidate[j, :] = rand(MvNormal(collect(x), Cov_j))
+                end
+
+                if (model.posterior isa Posterior) || (length(model.posterior) == 1)
+                    idx_inf = findall(isinf, logprior.([model.posterior],eachrow(candidate)))
+                else
+                    @error("Safeguard for multi distribution prior not implemented yet!")
+                end
+            end
+
+            # eval new candidate
+            stats = logjoint.([model], eachrow(candidate))
+            for (i,s) in enumerate(stats)
+                #lpostvec[i] = s[1]
+                ll_j[i] = s[2]
+                lp_j[i] = s[3]
+            end
+            
+            # compute new target and acceptance
+            new_target = ll_j .* β_j⁺ .+ lp_j
+            
+            α = min.(0, new_target .- old_target)
+            
+            accept = α .>= log.(rand(length(α)))
+
+            reject = .!accept
+
+            candidate[reject, :] .= chain[i - 1][reject, :]
+
+            chain[i] = candidate
+            old_target = copy(new_target)
+        end
+
+        # update
+        θ_j⁺ = chain[end]
+        β_j = β_j⁺
+        θ_j = θ_j⁺
+
+        # add logging
+        if verbose
+            next!(logging, showvalues = [("iteration count", j)])
+        end
+
+    end
+
+    return θ_j, S
+end
+
+function transitional_mcmc(model::MCMCModel, setup::MCMCSetup; kargs...)
+    return transitional_mcmc(
+        model,
+        setup.n,
+        setup.init;
+        burn_in = setup.burn_in,
+        kargs...,
+    )
+end
+
+function transitional_mcmc(model::MCMCModel, setup::MCMCSetup, initial_θ; kargs...)
+    return transitional_mcmc(
+        model,
+        setup.n,
+        initial_θ;
+        burn_in = setup.burn_in,
+        kargs...,
+    )
+end
+
+
+## src
+# Compute the next value for `β` and the nominal weights `w` using bisection.
+function _beta_and_weights(β::Real, L::AbstractVector{<:Real})
+    low = β
+    high = 2
+
+    local x, w # Declare variables so they are visible outside the loop
+
+    while (high - low) / Statistics.middle(low, high) > 1e-6 && high > eps()
+        x = Statistics.middle(low, high)
+        w = exp.((x - β) .* L)
+
+        if Statistics.std(w) / Statistics.mean(w) > 1
+            high = x
+        else
+            low = x
+        end
+    end
+
+    if x > 1
+        x = 1
+        w = exp.((x - β) .* L)
+    end
+
+    return x, w
 end

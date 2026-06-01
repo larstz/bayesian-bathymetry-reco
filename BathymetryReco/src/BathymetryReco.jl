@@ -13,6 +13,11 @@ module BathymetryReco
     using TOML
     using ApproxFun
 
+    # Additional Modules needed for TMCMC
+    using CovarianceEstimation
+    import Statistics
+    import StatsBase
+
     swe = PyNULL()
 
     function __init__()
