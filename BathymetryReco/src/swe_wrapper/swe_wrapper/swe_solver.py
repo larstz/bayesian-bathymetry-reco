@@ -218,6 +218,52 @@ class WaterChannelSolver(Solver):
         solver = problem.build_solver(d3.RK443)
         return solver
 
+class WaterChannelSolverDimensionless(Solver):
+    """Solver for the water channel problem."""
+
+    def __init__(self, domain: WaterChannelDomain,
+                 initial_conditions: WaterChannelInitialConditions,
+                 params: dict, bcfile: str='./test_data/mean_bc.txt'):
+        super().__init__(domain, initial_conditions, params)
+        self.lbc = leftbc(bcfile)
+        self.hc = initial_conditions.H
+        self.uc = np.sqrt(params['g']*self.hc)
+        self.xc = 13.5
+
+    def get_problem(self):
+        """Water channel boundary condition solver."""
+        def hl_function(*args):
+            t = args[0].data
+            htemp = self.lbc.f(t * self.xc / self.uc + self.ic.tstart)
+            self.ic.bc_field["g"] = (self.ic.H + htemp - self.ic.b['g'][0]) / self.hc
+            return self.ic.bc_field["g"]
+
+        def hl(*args, domain=self.ic.bc_field.domain, F=hl_function):
+            return d3.GeneralFunction(self.domain.dist, domain, layout='g', tensorsig=(),
+                                      dtype=np.float64, func=F, args=args)
+
+        lift_basis = self.domain.xbasis.derivative_basis(1)
+        lift = lambda A, n: d3.Lift(A, lift_basis, n)
+        tau1 = self.domain.dist.Field(name='tau1')
+        tau2 = self.domain.dist.Field(name='tau2')
+
+        self.name_dict['lift'] = lift
+        self.name_dict['tau1'] = tau1
+        self.name_dict['tau2'] = tau2
+        self.name_dict['hl'] = hl
+
+        # Problem
+        problem = d3.IVP([self.ic.h, self.ic.u, tau1, tau2], time=self.ic.t,
+                         namespace=self.name_dict)
+        problem.add_equation("dt(h) + lift(tau1, -1) + dx(u) = - dx((h-1)*u)")
+        problem.add_equation("dt(u) + lift(tau2, -1) + dx(h) + kappa*u = - u*dx(u) - g*dx(b)")
+        problem.add_equation("h(x='left') = hl(t)")
+        problem.add_equation("u(x='right') = 0")
+
+        # Build solver
+        solver = problem.build_solver(d3.RK443)
+        return solver
+
 
 class SWESolver():
     """Shallow water equation solver.
@@ -255,6 +301,10 @@ class SWESolver():
             self.domain = WaterChannelDomain(self.xbound, self.nx, self.params['dealias'])
             self.ic = WaterChannelInitialConditions(self.domain, tstart=tstart)
             self.solver = WaterChannelSolver(self.domain, self.ic, self.params, bcfile=bc_file)
+        elif self.problemtype == 'waterchannel_dimensionless':
+            self.domain = WaterChannelDomain(self.xbound, self.nx, self.params['dealias'])
+            self.ic = WaterChannelInitialConditions(self.domain, tstart=tstart)
+            self.solver = WaterChannelSolverDimensionless(self.domain, self.ic, self.params, bcfile=bc_file)
         else:
             raise ValueError("Invalid problem type")
 
@@ -275,6 +325,9 @@ class SWESolver():
         self.ic.b['g'] = np.squeeze(b_array)
         self.ic.h['g'] = self.ic.H - self.ic.b['g']
         self.ic.u['g'] = 0.0
+
+        if self.problemtype == 'waterchannel_dimensionless':
+            self.ic.h['g'] /= self.ic.H
 
         self.ic.tau1['g'] = 0.0
         self.ic.tau2['g'] = 0.0

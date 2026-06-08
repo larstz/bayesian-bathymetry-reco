@@ -165,6 +165,7 @@ Compute the log joint probability of parameters `θ` given the `MCMCModel`.
 function logjoint(model::MCMCModel, θ)
     log_prior = sum(logprior(model.posterior, θ))
     if log_prior == -Inf
+        println("Sampled out of prior support")
         return -Inf, 0.0, -Inf
     end
 
