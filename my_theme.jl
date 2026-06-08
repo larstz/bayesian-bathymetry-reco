@@ -4,10 +4,14 @@ plot_font = "Computer Modern"
 
 # Define desired sizes in points (for PDF output)
 desired_width_pt = 390# 1 point in Plots.jl units
+pamm_width_pt = 500
 
 pt2LaTex = 72/72.27
 textwidth = desired_width_pt*pt2LaTex # 390 points for PDF
 plot_height = Int(round(390 * 0.618 * pt2LaTex)) # Golden ratio for height
+
+textwidth_pamm = pamm_width_pt*pt2LaTex
+plot_height_pamm = Int(round(pamm_width_pt * 0.618 * pt2LaTex))
 
 add_theme(:custom, PlotTheme(
     fontfamily = plot_font,
@@ -21,6 +25,21 @@ add_theme(:custom, PlotTheme(
     label = nothing,
     margin = 0mm,
     size = (textwidth, plot_height),  # 390pt width for PDF
+    dpi=72
+))
+
+add_theme(:pamm, PlotTheme(
+    fontfamily = plot_font,
+    linewidth = 1,
+    markersize = 2,
+    labelfontsize = 8,
+    tickfontsize = 8,
+    legendfontsize = 8,
+    titlefontsize = 8,
+    framestyle = :box,
+    label = nothing,
+    margin = 0mm,
+    size = (textwidth_pamm, plot_height_pamm),  # 500pt width for PDF
     dpi=72
 ))
 
