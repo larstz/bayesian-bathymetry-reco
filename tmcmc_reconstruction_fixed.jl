@@ -8,22 +8,25 @@
 
 using Pkg
 Pkg.activate(".")
-Pkg.instantiate()
+#Pkg.instantiate()
+using Distributed
+
+addprocs(12)
 
 using Dates
 using TOML
 using Serialization
 using Plots
-
-using Distributions
 using PDMats
 using LinearAlgebra
-using BathymetryReco
-using ProgressMeter
 
-using Random
+@everywhere begin
+    using Distributions
+    using BathymetryReco
+    using Random
 
-Random.seed!(1910)
+    Random.seed!(1910)
+end
 
 ENV["GKSwstype"]="nul"
 
@@ -33,7 +36,7 @@ ENV["GKSwstype"]="nul"
 
 println("#############################\nRead in config file" )
 if isempty(ARGS)
-    config_file = abspath("./paper_configs/discretized/tmcmc_mean_heat_config.toml")
+    config_file = abspath("./paper_configs/tmcmc/parameterized_uniform_prior_config.toml")
 else
     config_file = abspath(ARGS[1])
 end
@@ -93,8 +96,7 @@ plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in obs_config
 ###############################################################################
 
 # define forward model
-solver = swe_solver(sim_config)
-forward_model(params) = simulation(params, solver, obs_data)
+@everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
 # Defining likelihood distribution
 likelihood_σ = mcmc_config.likelihood_σ
@@ -109,12 +111,14 @@ likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2
 
 # define prior distributions
 prior_dist = Vector{Distribution}()
-for prior_type in lowercase.(prior_settings.type)
-    if prior_type == "smooth"
-        smooth_kernel = SqExpMvNormal(mcmc_config.dim, prior_settings.lengthscale, prior_settings.var)
-        push!(prior_dist, MvNormal(smooth_kernel))
-    elseif prior_type == "sparse"
-        push!(prior_dist, Cauchy(prior_settings.loc, prior_settings.scale))
+for (i, prior_type) in enumerate(mcmc_config.prior.type)
+    prior_param = [mcmc_config.prior.loc[i], mcmc_config.prior.scale[i]]
+    if prior_type == "normal"
+        push!(prior_dist, Normal(prior_param...))
+    elseif prior_type == "uniform"
+        push!(prior_dist, Uniform(prior_param...))
+    else
+        error("Unsupported prior type: $prior_type")
     end
 end
 println("Using prior distribution: $(prior_settings.type)")
@@ -129,27 +133,15 @@ proposal = Normal(0.0,0.0)
 model = MCMCModel(pos, forward_model, obs_data, proposal)
 
 # Define initial parameters
-init_θ = mcmc_config.initial_θ
-if isempty(init_θ)
-    #init_θ = zeros(mcmc_config.n,mcmc_config.dim) # using only zero vectors does not make sense for tmcmc
-    if length(prior_dist) == 1
-        init_θ = rand(prior_dist[1],(mcmc_config.n,mcmc_config.dim))
-    else
-        mv_idx = isa.(pos.prior,MvNormal)
-        init_θ = rand(pos.prior[.!mv_idx][1],(mcmc_config.n,mcmc_config.dim))
-        #init_θ .+= transpose(rand(p,(mcmc_config.n)))
-        init_θ *= pos.prior[mv_idx][1].Σ
-    end 
+n_doubles = Int(mcmc_config.n/length(mcmc_config.initial_θ))
+init_θ = reduce(hcat, [v for v in mcmc_config.initial_θ, _ in 1:n_doubles])
+init_θ = Matrix(transpose(init_θ)) 
+    
 
-    toml_config["sampler"]["init"] = init_θ
-    xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
-    inip = plot(xs, init_θ[1,:], label="Initial sample $(1)",legend=:outerright)
-    for i = 2:10
-        plot!(inip,xs, init_θ[i,:], label="Initial sample $(i)")
-    end
-    display(inip)
+toml_config["sampler"]["init"] = init_θ
+inip = scatter(init_θ[:,1], init_θ[:,2], label="Initial samples n=$(size(init_θ, 1))")
+display(inip)
 
-end
 println("#############################")
 
 
@@ -158,14 +150,20 @@ println("#############################")
 ###############################################################################
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
-final_parameters, S = transitional_mcmc(model, mcmc_config, init_θ, verbose=true, logging=Progress(mcmc_config.n))
+time_stat = @timed begin
+    final_parameters, S, nEval = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+end
 
 println("TMCMC finished \n#############################" )
 
 ###############################################################################
 # Store the chains and create diagnostic plots                                #
 ###############################################################################
+nW = nprocs()
+
+rmprocs(workers())
 import StatsPlots
+using JLD
 
 if store_exp
     mkpath(target_dir)
@@ -179,18 +177,19 @@ if store_exp
         TOML.print(io, toml_config)
     end
 
-    pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)
-    StatsPlots.errorline!(pPlume, xs, final_parameters', errorstyle=:plume, label="Reconstruction")
-    #plot!(pPlume, xs, mean_init_θ, label="Mean initialization", lw=4)
-    
-    meanVec = reshape(mean(final_parameters,dims=1),(mcmc_config.dim,))
-    maxIdx = argmax(meanVec)
-    offset = 3
+    # save timings
+    time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval)
+    open("./timings.toml", "w") do io
+        TOML.print(io, Dict("time_summary" => time_dict))
+    end
 
-    pCorner = StatsPlots.cornerplot(final_parameters[:,maxIdx-offset:maxIdx+offset], compact=true, maxvariables=64)
-    plot!(pCorner;title="Corner plot",size=(1000,1000))
-    
-    savefig(pPlume, "reconstruction_with_confidence.png")
+    # save samples
+    @save "./final_parameters.jld" final_parameters
+
+    savefig(inip, "initial_samples.png")
+    scatter!(inip,final_parameters[:,1], final_parameters[:,2], label="Final samples", title="Final samples", xlabel="Parameter 1", ylabel="Parameter 2")  
+    savefig(inip, "final_samples.png")
 
 end
 

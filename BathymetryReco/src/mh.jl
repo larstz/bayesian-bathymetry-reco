@@ -264,6 +264,7 @@ function transitional_mcmc(
     verbose = false,
     logging = Progress(n),
     burn_in = 0,
+    parallel_eval = false,
     )
 
     # additional parameter - has nothing to do with other β apparently
@@ -276,8 +277,20 @@ function transitional_mcmc(
     @assert size(initial_θ,1) == n "initial_θ must be of size n × num_parameters"
     θ_j = copy(initial_θ)
 
+    eval_collect = [(0.0,0,θ_j)]
+
     # initial eval
-    stats = logjoint.([model], eachrow(θ_j))
+    if parallel_eval
+        @info("Using DISTRIBUTED evaluation of samples!")
+        stats = Distributed.pmap(θ_row -> logjoint(model, θ_row), eachrow(θ_j))
+        #stats = @distributed (vcat) for θ_row in eachrow(θ_j)
+        #    logjoint(model, θ_row)
+        #end
+    else
+        @info("Using SERIAL evaluation of samples!")
+        stats = logjoint.([model], eachrow(θ_j))
+    end
+    nEvals = n
     ll_j, lp_j = zeros(n), zeros(n)
     for (i,s) in enumerate(stats)
         #lpostvec[i] = s[1]
@@ -307,6 +320,8 @@ function transitional_mcmc(
 
         old_target = ll_j .* β_j⁺ .+ lp_j
 
+        push!(eval_collect, (β_j⁺, 1, θ_j⁺))
+
         (verbose) && print("step $(j) - start chain! \n")
         for i in 2:(burn_in + 2)
             candidate = copy(chain[i - 1])
@@ -327,15 +342,24 @@ function transitional_mcmc(
                     candidate[j, :] = rand(MvNormal(collect(x), Cov_j))
                 end
 
-                if (model.posterior isa Posterior) || (length(model.posterior) == 1)
+                if (model.posterior isa Posterior)
                     idx_inf = findall(isinf, logprior.([model.posterior],eachrow(candidate)))
                 else
-                    @error("Safeguard for multi distribution prior not implemented yet!")
+                    @error("Typeof(model.posterior) != $(typeof(model.posterior))!")
                 end
             end
 
-            # eval new candidate
-            stats = logjoint.([model], eachrow(candidate))
+            # eval new candidates
+            if parallel_eval
+                stats = Distributed.pmap(θ_row -> logjoint(model, θ_row), eachrow(candidate))
+                #stats = @distributed (vcat) for θ_row in eachrow(candidate)
+                #    logjoint(model, θ_row)
+                #end
+            else
+                stats = logjoint.([model], eachrow(candidate))
+            end
+            nEvals += n
+            #
             for (i,s) in enumerate(stats)
                 #lpostvec[i] = s[1]
                 ll_j[i] = s[2]
@@ -355,6 +379,8 @@ function transitional_mcmc(
 
             chain[i] = candidate
             old_target = copy(new_target)
+
+            push!(eval_collect, (β_j⁺, i, candidate))
         end
 
         # update
@@ -369,7 +395,7 @@ function transitional_mcmc(
 
     end
 
-    return θ_j, S
+    return θ_j, S, nEvals, eval_collect
 end
 
 function transitional_mcmc(model::MCMCModel, setup::MCMCSetup; kargs...)

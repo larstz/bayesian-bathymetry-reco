@@ -32,6 +32,9 @@ Setting up:
 4. Setup julia environment `julia -e 'using Pkg; Pkg.activate("."); Pkg.develop(path="BathymetryReco")'`
 5. Setup PyCall to work with the correct python `julia -e 'using Pkg; Pkg.activate("."); using PyCall; ENV["PYTHON"]="path/to/env/bin/python"; Pkg.build("PyCall");'`
 6. To setup dedalus correctly create file state at "myenv/conda-meta" and fill it with `"{"env_vars": {"OMP_NUM_THREADS": "1", "NUMEXPR_MAX_THREADS": "1"}}"`
+alternatively call: <br>
+`micromamba env config vars set OMP_NUM_THREADS=1` <br>
+`micromamba env config vars set NUMEXPR_MAX_THREADS=1`
 
 ## Basic Usage
 
@@ -41,7 +44,7 @@ Setting up:
 5. After inference the inference data is stored (if save=true in config.toml)
 6. To plot the results run `julia plots.jl path/to/exeperiment/data` for the parameterized bathymetry, `julia plot_discrete_bathymetry.jl path/to/exeperiment/data` for the discretized bathymetry.
 
-## How to reproduce the data and figures
+## How to reproduce the data and figures from *Stietz et al. (2026): Bathymetry Reconstruction by Bayesian Inference [Stietz2026-1]*
 
 Follow step 0. from basic usage before starting
 
@@ -55,7 +58,7 @@ Same as Figure 2 but use the configs in paper
 `paper_configs/simulation_configs/peak_test/` for simulation and `paper/configs/parametrized/peak_test/` for reconstruction.
 
 ### Figure 4
-1. Create the synthetic measurement by calling `julia toy_measurement.jl paper_configs/simulation_configs/simulation_config_toy.jl`
+1. Create the synthetic measurement by calling `julia toy_measurement.jl paper_configs/simulation_configs/simulation_config_toy.toml`
 2. Create the landscape scan by calling `julia scan_lp.jl`
 3. Run the reconstruction with uniform priors by calling `julia mcmc_reconstruction.jl paper_configs/parametrized/parameterized_uniform_prior_config.toml`
 4. Create the figure with `julia plot_lp.jl data/results/lp_scan/lp_scan_{DATE_ID} data/results/paper_results/ data/results/paper_results/parametrized/toy_tests/sensor-2-3-4/prior-uniform-uniform/proposal-rw/stepsize-0.1-0.01/{DATE_ID}_waterchannel_exact_bathy`
@@ -87,6 +90,25 @@ Same as Figure 2 but use the configs in paper
 5. Run `julia plot_discrete_experiment.jl data/results/paper_results/toy_tests/sensor-2-3-4/prior-sparse/proposal-rw-smooth/stepsize-0.002/{DATE_ID}_waterchannel_exact_bathy`
 6. The values from the Table can be found in `metrics_1000.csv` in the corresponding experiment directory
 
-### Reference
+## Reproduce Figures of *Stietz et al. (2026): Comparing Transitional Markov chain Monte Carlo and Metropolis-Hastings sampling for Bayesian bathymetry reconstruction [Stietz2026-2]* 
 
-Angel, J., Behrens, J., Götschel, S., Hollm, M., Ruprecht, D., & Seifried, R. (2024). Data artefact: Bathymetry reconstruction from experimental data with PDE-constrained optimisation. https://doi.org/10.15480/882.9403
+### Figure 2
+1. Create the synthetic measurement by calling `julia toy_measurement.jl paper_configs/simulation_configs/simulation_config_toy.toml`
+2. Create the landscape scan by calling `julia scan_lp.jl`
+3. Run the reconstruction with uniform priors with MH-MCMC by calling `julia mcmc_reconstruction.jl paper_configs/parametrized/parameterized_uniform_prior_config.toml`
+3. Run the reconstruction with uniform priors with TMCMC by calling `julia tmcmc_reconstruction_fixed.jl paper_configs/parametrized/tmcmc_parameterized_uniform_prior_config.toml`
+4. Create the figure with `julia plot_lp_tmcmc.jl data/results/lp_scan/lp_scan_{DATE_ID} data/results/paper_results/ data/results/paper_results/parametrized/toy_tests/sensor-2-3-4/prior-uniform-uniform/proposal-rw/stepsize-0.1-0.01/{DATE_ID}_waterchannel_exact_bathy_tmcmc data/results/paper_results/parametrized/toy_tests/sensor-2-3-4/prior-uniform-uniform/proposal-rw/stepsize-0.1-0.01/{DATE_ID}_waterchannel_exact_bathy`
+
+### Figure 3
+1. If not done so follow step 0. from the Basic usage section under [Stietz2026-1].
+2. Run `julia mcmc_reconstruction_serial.jl paper_configs/discretized/mean_heat_config.toml`
+3. Run `julia tmcmc_reconstruction_serial.jl paper_configs/discretized/tmcmc_mean_heat_config.toml`
+4. Call `julia plot_discrete_experiment_tmcmc.jl data/results/paper_results/heat_tests/mean_tests/sensor-2-3-4/prior-smooth-sparse/proposal-rw-smooth/stepsize-0.001/{DATE_ID}_mean_heat_wb data/results/paper_results/heat_tests/mean_tests/sensor-2-3-4/prior-smooth-sparse/proposal-rw-smooth/stepsize-0.001/{DATE_ID}_mean_heat_wb_tcmcmc`. The plots can then be found in the experiment directory under `paper_results/heat_tests/mean_tests/sensor-2-3-4/prior-smooth-sparse/proposal-rw-smooth/stepsize-0.001/{DATE_ID}_mean_heat_wb_tcmcmc/plots/`
+
+### Figure 4
+1. Follow steps from Figure 3 [Stietz2026-2]
+2. Set handle `plot_sensor_simulation = true` in `plot_discrete_experiment_tmcmc.jl` and Sensor-figures are co-created with Figure 3
+
+## Reference
+
+- Angel, J., Behrens, J., Götschel, S., Hollm, M., Ruprecht, D., & Seifried, R. (2024). Data artefact: Bathymetry reconstruction from experimental data with PDE-constrained optimisation. https://doi.org/10.15480/882.9403

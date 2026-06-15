@@ -8,22 +8,25 @@
 
 using Pkg
 Pkg.activate(".")
-Pkg.instantiate()
+#Pkg.instantiate()
+using Distributed
+
+addprocs(4)
 
 using Dates
 using TOML
 using Serialization
 using Plots
-
-using Distributions
 using PDMats
 using LinearAlgebra
-using BathymetryReco
-using ProgressMeter
 
-using Random
+@everywhere begin
+    using Distributions
+    using BathymetryReco
+    using Random
 
-Random.seed!(1910)
+    Random.seed!(1910)
+end
 
 ENV["GKSwstype"]="nul"
 
@@ -93,8 +96,7 @@ plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in obs_config
 ###############################################################################
 
 # define forward model
-solver = swe_solver(sim_config)
-forward_model(params) = simulation(params, solver, obs_data)
+@everywhere forward_model(params) = simulation(params, $sim_config, $obs_data)
 
 # Defining likelihood distribution
 likelihood_σ = mcmc_config.likelihood_σ
@@ -137,17 +139,21 @@ if isempty(init_θ)
     else
         mv_idx = isa.(pos.prior,MvNormal)
         init_θ = rand(pos.prior[.!mv_idx][1],(mcmc_config.n,mcmc_config.dim))
-        #init_θ .+= transpose(rand(p,(mcmc_config.n)))
         init_θ *= pos.prior[mv_idx][1].Σ
+        maxV = [maximum(abs.(r)) for r in eachrow(init_θ)]
+        fac = ones(size(maxV))
+        fac[maxV .>  0.3] = maxV[maxV .>  0.3] .* 0.3./maxV[maxV .>  0.3]
+        init_θ .*= fac
     end 
 
     toml_config["sampler"]["init"] = init_θ
     xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
     inip = plot(xs, init_θ[1,:], label="Initial sample $(1)",legend=:outerright)
-    for i = 2:10
+    for i = 2:20
         plot!(inip,xs, init_θ[i,:], label="Initial sample $(i)")
     end
     display(inip)
+    savefig(inip, "initial_samples.png")
 
 end
 println("#############################")
@@ -158,14 +164,20 @@ println("#############################")
 ###############################################################################
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
-final_parameters, S = transitional_mcmc(model, mcmc_config, init_θ, verbose=true, logging=Progress(mcmc_config.n))
+time_stat = @timed begin
+    final_parameters, S = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+end
 
 println("TMCMC finished \n#############################" )
 
 ###############################################################################
 # Store the chains and create diagnostic plots                                #
 ###############################################################################
+nW = nprocs()
+
+rmprocs(workers())
 import StatsPlots
+using JLD
 
 if store_exp
     mkpath(target_dir)
@@ -178,6 +190,16 @@ if store_exp
     open("./experiment_config.toml", "w") do io
         TOML.print(io, toml_config)
     end
+
+    # save timings
+    time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nprocs())
+    open("./timings.toml", "w") do io
+        TOML.print(io, Dict("time_summary" => time_dict))
+    end
+
+    # save samples
+    @save "./final_parameters.jld" final_parameters
 
     pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)
     StatsPlots.errorline!(pPlume, xs, final_parameters', errorstyle=:plume, label="Reconstruction")

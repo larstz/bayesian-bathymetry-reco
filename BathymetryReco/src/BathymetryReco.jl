@@ -17,7 +17,8 @@ module BathymetryReco
     using CovarianceEstimation
     import Statistics
     import StatsBase
-
+    using Distributed
+    
     swe = PyNULL()
 
     function __init__()
