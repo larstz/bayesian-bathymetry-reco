@@ -312,7 +312,7 @@ function transitional_mcmc(
         weights = StatsBase.FrequencyWeights(w_j ./ sum(w_j))
         idx = StatsBase.sample(collect(1:(n)), weights, n; replace=true)
         θ_j⁺ = θ_j[idx, :]
-        Cov_j = tmcmc_β^2 * cov(covariance_method, θ_j, weights)
+        Cov_j = tmcmc_β^2 * cov(covariance_method, θ_j⁺)
 
         # Run inner MH algorithm
         chain = Vector{Matrix}(undef, burn_in + 2)
