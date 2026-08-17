@@ -23,7 +23,7 @@ real_data = false
 sensor_rate = 0.01
 noise_var = 0.05
 sensor_id = [2, 3, 4]
-path = "./data/toy_measurement/waterchannel_gaussian_1_peaks/[4.0, 0.15]"
+path = "/perm/mat/cls1557/bayesian-inference/data/simulations/toy_measurement/waterchannel_gaussian_1_peaks/[4.0, 0.15]"
 
 [sampler]
 stepsize = [0.1, 0.01]
