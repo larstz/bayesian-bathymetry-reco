@@ -6,6 +6,7 @@ using StatsPlots
 using Statistics
 using BathymetryReco
 using MCMCChains
+using Distributions
 using LaTeXStrings
 using CSV
 using DataFrames
@@ -80,7 +81,20 @@ grid_error = mcse(mcmc_chain)[:, :mcse]
 grid_ci_low = hpd(mcmc_chain)[:, :lower]
 grid_ci_high = hpd(mcmc_chain)[:, :upper]
 
-result_df = DataFrame(x=xs, mean_bathy=mean_bathy, ci_low=grid_ci_low, ci_high=grid_ci_high, mcse=grid_error)
+# effective sample size per parameter (used for t-multiplier)
+n_eff = ess(mcmc_chain)[:, :ess]
+# safe function for t multiplier from n_eff
+function t_from_neff(ne)
+    nei = max(2, floor(Int, ne))
+    return quantile(TDist(nei-1), 0.975)
+end
+t_vals = [t_from_neff(ne) for ne in n_eff]
+
+# mean CI (mean ± t * MCSE)
+mean_ci_low = mean_bathy .- t_vals .* grid_error
+mean_ci_high = mean_bathy .+ t_vals .* grid_error
+
+result_df = DataFrame(x=xs, mean_bathy=mean_bathy, mean_ci_low=mean_ci_low, mean_ci_high=mean_ci_high, mcse=grid_error , grid_ci_high=grid_ci_high, grid_ci_low=grid_ci_low, n_eff=n_eff, t_multiplier=t_vals)
 CSV.write(joinpath(exp, "bathy_statistics_$(burnin).csv"), result_df)
 
 bathy_label = latexstring("b_i, \\ \\mathrm{NRMSE} = $(round(bathy_nrmse, digits=3))")
@@ -120,6 +134,19 @@ scatter!(ciplot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black,
 savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin)$(appendix).png")
 savefig(ciplot, exp*"/plots/mean_bathy_credible_interval_$(burnin)$(appendix).pdf")
 println("Store at $(exp*"/plots/mean_bathy_credible_interval_$(burnin)$(appendix).png")")
+
+# Combined comparison plot: HPD vs Mean ± t·MCSE
+comp_plot = plot(xs, exact_b; label="Exact bathymetry", color=:black)
+plot!(comp_plot, xs, mean_bathy, ribbon=(mean_bathy .- grid_ci_low, grid_ci_high .- mean_bathy), color=Plots.palette(:default)[1], label="95% Credible Interval (HPD)", ylims=(-0.05,0.21), xlabel=L"x \\ [m]", ylabel=L"b(x) \\ [m]", grid=true)
+plot!(comp_plot, xs, mean_bathy, ribbon=(mean_bathy .- mean_ci_low, mean_ci_high .- mean_bathy), color=Plots.palette(:default)[3], label="Mean ± t·MCSE (estimation uncertainty)", fillalpha=0.25)
+plot!(comp_plot, xs, mean_bathy; label=bathy_label, color=Plots.palette(:default)[2])
+scatter!(comp_plot, [3.5,5.5,7.5], [0,0,0], label="Sensor locations", color=:black, markersize=6, marker=:star5)
+# add sparse errorbars for Mean ± t·MCSE on combined plot (every 5th point)
+idx = 1:5:length(xs)
+scatter!(comp_plot, xs[idx], mean_bathy[idx], yerror=(t_vals[idx] .* grid_error[idx]), label="Mean ± t·MCSE (points)", color=Plots.palette(:default)[3], marker=:circle)
+savefig(comp_plot, exp*"/plots/mean_bathy_hpd_vs_meanci_$(burnin)$(appendix).png")
+savefig(comp_plot, exp*"/plots/mean_bathy_hpd_vs_meanci_$(burnin)$(appendix).pdf")
+println("Store at $(exp*"/plots/mean_bathy_hpd_vs_meanci_$(burnin)$(appendix).png")")
 
 sim_chain = forward(mean_bathy)
 
