@@ -128,11 +128,12 @@ fr = [freqs[idx[id_max[1]]] for id_max in max_fr_id]
 # kernel model for time correlation
 # damped oscillation model
 damped_oscillation(τ, p) = exp.(-abs.(τ)./p[1]) .* cos.(2π*p[2].*τ)
+paper_oscillator(τ, p) = exp.(-abs.(τ).*p[1]) .* (cos.(p[2].*τ) + p[1]/p[2] .*sin.(p[2].*abs.(τ)))
 
 p0 = [2.0, mean(fr)] # initial guess for parameters
 
 p_mean = zeros(length(p0))
-
+p_pap = zeros(length(p0))
 # fit the model to each column of the autocorrelation function
 for r in eachcol(acf)
     p_fit = curve_fit(damped_oscillation, obs_data.t, r, p0)
@@ -140,12 +141,21 @@ for r in eachcol(acf)
     global p_mean += p_fit.param
 end
 
+for r in eachcol(acf)
+    p_fit = curve_fit(paper_oscillator, obs_data.t, r, p0)
+    println("Fitted parameters for residual: $(p_fit.param)")
+    global p_pap += p_fit.param
+end
+
 p_mean = p_mean ./ size(residual, 2)
+p_pap = p_pap ./ size(residual, 2)
 
 C_temporal = damped_oscillation(obs_data.t .- obs_data.t', p_mean)
+C_pap = paper_oscillator(obs_data.t .- obs_data.t', p_pap)
 C_spatial = spatial_cov_mat
 
 C_total = kron(C_spatial, C_temporal)
+C_tot_pap = kron(C_spatial, C_pap)
 
 residual = vec(residual)
 
