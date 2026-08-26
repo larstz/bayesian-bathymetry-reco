@@ -1,18 +1,14 @@
 using Pkg
 Pkg.activate(".")
 using Serialization
-using Plots
-using StatsPlots
-using Statistics
-using LaTeXStrings
 using MCMCChains
 using Distributions
 using Distributed
 
-parallel = false
+parallel = true
 
 if parallel
-    addprocs(2)
+    addprocs(32)
     @everywhere begin
         using BathymetryReco
     end
@@ -20,12 +16,10 @@ else
     using BathymetryReco
 end
 
-include("my_theme.jl")
-theme(:custom_slides)
 
 println("#############################\nRead in chain" )
 
-exp = "./data/results/results_for_paper/2026-02-09-13-53-04_mean_heat_wb" #ARGS[1]
+exp = "data/results/heat_tests/mean_tests/sensor-2-3-4/prior-smooth-sparse/proposal-rw/stepsize-0.001/2026-02-09-13-53-04_mean_heat_wb" #ARGS[1]
 ani = false
 include_adjoint = false
 plot_sensor_simulation = false
@@ -62,46 +56,21 @@ ar = chain[burnin+1:burnin+sample_number,end]
 sensor_simulations = Array{Float64}(undef, sample_number, length(obs_data.t), length(obs_data.x))
 
 if parallel
-    @distributed for i in 1:sample_number
-        println("Simulating for sample ", i, " with log-posterior ", lp[i], " and acceptance rate ", ar[i])
-        sim = forward(bathy[i, :])
-        println(size(sim))
-        println(size(sensor_simulations[i, :, :]))
+    sims = pmap(1:sample_number) do i
+        forward(bathy[i, :])
+    end
+    for (i, sim) in enumerate(sims)
         sensor_simulations[i, :, :] = sim
     end
 else
     for i in 1:sample_number
         println("Simulating for sample ", i, " with log-posterior ", lp[i], " and acceptance rate ", ar[i])
-        @time sim = forward(bathy[i, :])
+        sim = forward(bathy[i, :])
         sensor_simulations[i, :, :] = sim
     end
 end
 
-mean_pred = dropdims(mean(sensor_simulations, dims=1), dims=1)
+serialize( joinpath(exp, "sensor_simulations.jls"), sensor_simulations)
 
 sim_chains = Chains(sensor_simulations)
-
-rel_l2_sim_error = dropdims(sqrt.(sum((sensor_simulations .- obs_H).^2, dims=2)) ./ sqrt.(sum((obs_H).^2, dims=2)), dims=2)
-
-mean_rel_l2_sim_error = round.(mean(rel_l2_sim_error, dims=1).*100, digits=4)
-std_rel_l2_sim_error = round.((std(rel_l2_sim_error, dims=1))./sqrt(sample_number).*100, digits=4)
-
-for i in 1:3
-    error_string = latexstring("\\varepsilon = $(mean_rel_l2_sim_error[i]) \\pm $(std_rel_l2_sim_error[i])\\%")
-
-    sensor_chain = sim_chains[i]
-    #ess = ess(sensor_chain)[:, :ess]
-    se = mcse(sensor_chain)[:, :mcse]
-    t_d = [quantile(TDist(10.- 1), 0.975) for n_e in ess]
-    se = se .* t_d
-    ci_low = hpd(sensor_chain)[:, :lower]
-    ci_high = hpd(sensor_chain)[:, :upper]
-
-    ribbon = (mean_pred[:,i] .- ci_low[:,i], ci_high[:,i] .- mean_pred[:,i])
-    ppc_plot = plot(;xlabel= L"t [\mathrm{s}]", ylabel= L"H [\mathrm{m}]")
-    plot!(ppc_plot, obs_data.t, obs_data.H[:,i]; title="Sensor $i, ε=$(mean_rel_l2_sim_error[i]) +-$(std_rel_l2_sim_error[i])%", label="measurement", linestyle=:dash)
-    plot!(ppc_plot, obs_data.t, mean_pred[:,i]; ribbon=ribbon, label="mean prediction with 95% CI", linestyle=:dot, linewidth=2)
-    scatter!(ppc_plot, obs_data.t, mean_pred[:,i], yerror=se, alpha=0.3, color=:blue)
-    savefig(ppc_plot, joinpath(exp, "plots/sim_chain_sensor_$(i)_ci.png"))
-    savefig(ppc_plot, joinpath(exp, "plots/sim_chain_sensor_$(i)_ci.pdf"))
-end
+serialize(joinpath(exp, "sim_chains.jls"), sim_chains)
