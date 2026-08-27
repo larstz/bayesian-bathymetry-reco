@@ -230,7 +230,7 @@ println("TMCMC finished \n#############################" )
 ###############################################################################
 # Store the chains and create diagnostic plots                                #
 ###############################################################################
-nW = nprocs()
+nW = nprocs() -1
 
 rmprocs(workers())
 import StatsPlots
@@ -250,7 +250,7 @@ if store_exp
 
     # save timings
     time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
-                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nprocs())
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval)
     open("./timings.toml", "w") do io
         TOML.print(io, Dict("time_summary" => time_dict))
     end
