@@ -23,7 +23,7 @@ real_data = false
 sensor_rate = 0.01
 noise_var = 0.05
 sensor_id = [2, 3, 4]
-path = "./data/toy_measurement/paper/waterchannel_exact_bathy/"
+path = "/perm/mat/cls1557/bayesian-inference/data/simulations/toy_measurement/paper/waterchannel_exact_bathy/"
 
 [sampler]
 stepsize = [0.002]

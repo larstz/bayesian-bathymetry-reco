@@ -166,13 +166,22 @@ Returns log_posterior, log_likelihood, log_prior.
 function logjoint(model::MCMCModel, θ)
     log_prior = sum(logprior(model.posterior, θ))
     if log_prior == -Inf
+        println("Sampled out of prior support")
         return -Inf, 0.0, -Inf
     end
 
     try
         sim_observations = model.forward(θ)
+
+        # compute the residual between simulated and observed data
+        if size(sim_observations)[1] == prod(size(model.observation.H))
+            r = (sim_observations - vec(model.observation.H))'
+        else
+            r = sim_observations .- model.observation.H
+        end
+
         log_likelihood =
-            sum(loglikelihood(model.posterior, sim_observations .- model.observation.H))
+            sum(loglikelihood(model.posterior, r))
         return log_prior + log_likelihood, log_likelihood, log_prior
     catch err
         if isa(err, DimensionMismatch) || isa(err, BoundsError)

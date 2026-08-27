@@ -2,7 +2,7 @@ title = "Toy Measurement Setup"
 
 [output]
 save = true
-path = "./data/toy_measurement/paper/"
+path = "/perm/mat/cls1557/bayesian-inference/data/simulations/toy_measurementpaper/"
 
 [simulation]
 xbounds = [1.5, 15.0]

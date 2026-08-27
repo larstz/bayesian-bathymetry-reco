@@ -1,5 +1,5 @@
 export simulation
-function simulation(param, sim_params::SimulationSetup, observation::ObservationData)
+function simulation(param, sim_params::SimulationSetup, observation::ObservationData; correlated::Bool=false)
     solver = swe.SWESolver(
         sim_params.xbounds,
         sim_params.timestep,
@@ -12,7 +12,7 @@ function simulation(param, sim_params::SimulationSetup, observation::Observation
         problemtype = sim_params.scenario,
         bc_file = sim_params.bc_file,
     )
-    return simulation(param, solver, observation)
+    return simulation(param, solver, observation, correlated=correlated)
 end
 
 """
@@ -21,7 +21,7 @@ end
 Calculate the observation from the shallow water equations `solver` with the given `param`
 as bathymetry, using the provided `solver` and `observation` data.
 """
-function simulation(param, solver::PyObject, observation::ObservationData)
+function simulation(param, solver::PyObject, observation::ObservationData; correlated::Bool=false)
     ########################## Using Fun from ApproxFun.jl ########################
     # f = Fun(Chebyshev(solver.xbound[1]..solver.xbound[2]), param)
     # solver_bathy = f.(solver.domain.x)
@@ -41,6 +41,12 @@ function simulation(param, solver::PyObject, observation::ObservationData)
         indices = findall(x -> x ∈ observation.t, t_sim)
         sim_observations = sim_observations[indices, :]
     end # only use sim at measured timesteps, maybe replace by proper interpolation
+
+    # for correlated likelihood, we need to vectorize the simulated observations
+    if correlated
+        sim_observations = vec(sim_observations)
+    end
+
     return sim_observations
 end
 

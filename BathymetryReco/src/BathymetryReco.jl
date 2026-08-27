@@ -22,7 +22,7 @@ module BathymetryReco
     swe = PyNULL()
 
     function __init__()
-        pushfirst!(pyimport("sys")."path", @__DIR__)
+        #pushfirst!(pyimport("sys")."path", @__DIR__)
         copy!(swe, pyimport("swe_wrapper"))
     end
 

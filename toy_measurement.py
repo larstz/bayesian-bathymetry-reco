@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 import sys
 import time
-sys.path.append("./BathymetryReco/src")
+sys.path.append("./BathymetryReco/src/swe_wrapper")
 from swe_wrapper import SWESolver, rampFunc, gaussian_bathymetry
 
 
@@ -14,9 +14,10 @@ def main():
     for reconstruction of bathymetry."""
     # Change to the directory of this file
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    with open("config.toml" , "rb") as f:
+    with open("simulation_config.toml" , "rb") as f:
         config = tomllib.load(f)
-    path = config["observation"]["path"]
+    path = config["output"]["path"]
+    store = config["output"]["save"]
 
     # Set up the parameters for measurement simulation (# for simulation in MCMC)
     sim_params = config["simulation"]
@@ -31,7 +32,14 @@ def main():
     problemtype = sim_params["scenario"]
     problem_bathy = sim_params["bathymetry"]
     left_bc = sim_params["bc_file"]
-    store = False
+
+    # dimensionless recalculation of setup
+    if "dimensionless" in problemtype:
+        xc = xbounds[1]-xbounds[0]
+        xbounds = [0, 1]
+        uc = np.sqrt(g*0.3)
+        total_t = total_t*(uc/xc)
+        timestep = timestep*(uc/xc)
 
     # Create SWE solver and calculate the solution
     solver = SWESolver(xbounds, timestep, nx, total_t,
@@ -43,31 +51,34 @@ def main():
     bathy_config = config["bathymetry"]
     bathy_params = bathy_config["parameters"]
 
-    if bathy_config["parametrized"]:
+    bathy = np.zeros_like(x)
+
+    if bathy_config["type"] == "parameterized":
         assert bathy_config["npeaks"] == len(bathy_params)//2 # Check if the number of peaks is correct
-        bathy = np.zeros_like(x)
         for i in range(bathy_config["npeaks"]):
             bathy = gaussian_bathymetry(x, bathy_params[2*i:2*(i+1)])
-    else:
+    elif bathy_config["type"] == "ramp":
         bathy = rampFunc(x)
 
     print("Start Simulation")
     start = time.time()
-    H_sensor, t_array, h_array, u_array = solver.solve(bathy)
+    equi_grid = np.linspace(xbounds[0], xbounds[1], nx)
+    H_equi, t_array, h_array, u_array = solver.solve(bathy, sensor_pos=equi_grid)
     end = time.time()
     print(f"Simulation Done after {end-start}")
     dx = (xbounds[1]-xbounds[0])/nx
     # filename
-    filename = f"simulation_data_{problemtype}_{problem_bathy}_test.h5"
+    filename = f"simulation_data_{problemtype}_{problem_bathy}_no_friction.h5"
     full_path = os.path.join(path, filename)
     print("Saving results to: ", full_path)
+    np.save("H_no_friction_dimensionless.npy", H_equi)
     if store:
         # Ensure the directory exists
         os.makedirs(path, exist_ok=True)
         with h5py.File(full_path, "w") as f:
             f.create_dataset("h", data=h_array)
             f.create_dataset("u", data=u_array)
-            f.create_dataset("H_sensor", data=H_sensor)
+            #f.create_dataset("H_sensor", data=H_sensor)
             f.create_dataset("b_exact", data=bathy)
             f.create_dataset("xgrid", data=np.copy(solver.domain.x))
             f.create_dataset("t_array", data=t_array)
@@ -80,7 +91,7 @@ def main():
             f.attrs["g"] = g
             f.attrs["k"] = kappa
             f.attrs["M"] = nx
-            if bathy_config["parametrized"]:
+            if bathy_config["type"] == "parameterized":
                 f.attrs["npeaks"] = bathy_config["npeaks"]
                 f.attrs["bathy_params"] = bathy_params
 

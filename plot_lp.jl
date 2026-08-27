@@ -39,7 +39,7 @@ end
 println("Read in data from disk")
 
 cwd = pwd()
-lp_experiment = "data/results/lp_scan/lp_scan_2026-04-07-09-43-57/"#ARGS[1]
+lp_experiment = ARGS[1]
 
 test_prior = true
 
