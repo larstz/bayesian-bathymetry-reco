@@ -21,6 +21,11 @@ using LinearAlgebra
 using BathymetryReco
 using ProgressMeter
 
+using FFTW
+using StatsBase
+using LsqFit
+using Random
+
 using Random
 
 Random.seed!(1910)
@@ -94,18 +99,69 @@ plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in obs_config
 
 # define forward model
 solver = swe_solver(sim_config)
-forward_model(params) = simulation(params, solver, obs_data)
+forward_model_uncorrelated(params) = simulation(params, solver, obs_data, correlated=false)
+forward_model_correlated(params) = simulation(params, solver, obs_data, correlated=true)
 
 # Defining likelihood distribution
 likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
-    flat_signal = forward_model(zeros(mcmc_config.dim))
-    likelihood_σ = vec(std(obs_data.H .- flat_signal, dims=1)) # set to std of flat signal residuals
-    println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
+    flat_signal = forward_model_uncorrelated(zeros(mcmc_config.dim))
+    residual = obs_data.H .- flat_signal
+    likelihood_σ = vec(std(residual, dims=1)) # set to std of flat signal residuals
+    spatial_cov_mat = cov(residual)
+        println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
 end
 
-println("Using $(likelihood_σ) std for Likelihood distribution.")
-likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
+timesteps = length(obs_data.t)
+
+acf = autocor(residual, 0:timesteps-1)
+# estimate dominant frequency of the residual signal for correlation fit initial guess
+Rf = fft(residual )#.- mean(residual))
+Sf = abs.(Rf).^2
+
+# positive frequencies only
+idx = 1:div(timesteps,2)
+
+max_fr_id = argmax(Sf[idx, :], dims=1)
+
+freqs = fftfreq(timesteps, 1/sim_config.timestep)
+fr = [freqs[idx[id_max[1]]] for id_max in max_fr_id]
+
+# kernel model for time correlation
+# damped oscillation model
+damped_oscillation(τ, p) = exp.(-abs.(τ)./p[1]) .* cos.(2π*p[2].*τ)
+paper_oscillator(τ, p) = exp.(-abs.(τ).*p[1]) .* (cos.(p[2].*τ) + p[1]/p[2] .*sin.(p[2].*abs.(τ)))
+
+p0 = [2.0, mean(fr)] # initial guess for parameters
+
+p_mean = zeros(length(p0))
+p_pap = zeros(length(p0))
+# fit the model to each column of the autocorrelation function
+for r in eachcol(acf)
+    p_fit = curve_fit(damped_oscillation, obs_data.t, r, p0)
+    println("Fitted parameters for residual: $(p_fit.param)")
+    global p_mean += p_fit.param
+end
+
+for r in eachcol(acf)
+    p_fit = curve_fit(paper_oscillator, obs_data.t, r, p0)
+    println("Fitted parameters for residual: $(p_fit.param)")
+    global p_pap += p_fit.param
+end
+
+p_mean = p_mean ./ size(residual, 2)
+p_pap = p_pap ./ size(residual, 2)
+
+C_temporal = damped_oscillation(obs_data.t .- obs_data.t', p_mean)
+C_pap = paper_oscillator(obs_data.t .- obs_data.t', p_pap)
+C_spatial = spatial_cov_mat
+
+C_total = kron(C_spatial, C_temporal)
+C_tot_pap = kron(C_spatial, C_pap)
+
+residual = vec(residual)
+
+likelihood_dist = MvNormal(zeros(length(residual)), PDMat(C_total))
 
 # define prior distributions
 prior_dist = Vector{Distribution}()
@@ -126,7 +182,7 @@ toml_config["sampler"]["likelihood_var"] = likelihood_σ
 pos = Posterior(prior_dist, likelihood_dist)
 # proposal only needed to fit with the MCMCModel type but not needed in TMCMC
 proposal = Normal(0.0,0.0)
-model = MCMCModel(pos, forward_model, obs_data, proposal)
+model = MCMCModel(pos, forward_model_correlated, obs_data, proposal)
 
 # Define initial parameters
 init_θ = mcmc_config.initial_θ

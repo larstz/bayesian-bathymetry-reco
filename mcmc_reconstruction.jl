@@ -8,7 +8,7 @@
 
 using Pkg
 Pkg.activate(".")
-#Pkg.instantiate()
+Pkg.instantiate()
 using Distributed
 
 addprocs(7)

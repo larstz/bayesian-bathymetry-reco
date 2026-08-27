@@ -274,6 +274,7 @@ function transitional_mcmc(
     logging = Progress(n),
     burn_in = 0,
     parallel_eval = false,
+    collect_evals = false
     )
 
     # additional parameter - has nothing to do with other β apparently
@@ -309,6 +310,7 @@ function transitional_mcmc(
 
     #
     S = 0.0
+    ESS_vec = [(β_j,n)]
     while β_j < 1
         j += 1
         (verbose) && print("step $(j) - current β=$(β_j)! \n")
@@ -329,7 +331,9 @@ function transitional_mcmc(
 
         old_target = ll_j .* β_j⁺ .+ lp_j
 
-        push!(eval_collect, (β_j⁺, 1, θ_j⁺))
+        if collect_evals
+            push!(eval_collect, (β_j⁺, 1, θ_j⁺))
+        end
 
         (verbose) && print("step $(j) - start chain! \n")
         for i in 2:(burn_in + 2)
@@ -388,8 +392,9 @@ function transitional_mcmc(
 
             chain[i] = candidate
             old_target = copy(new_target)
-
-            push!(eval_collect, (β_j⁺, i, candidate))
+            if collect_evals
+                push!(eval_collect, (β_j⁺, i, candidate))
+            end
         end
 
         # update
@@ -402,9 +407,15 @@ function transitional_mcmc(
             next!(logging, showvalues = [("iteration count", j)])
         end
 
-    end
+        ESS = (sum(w_j))^2 / sum(w_j.^2)
+        ESS_vec = [(β_j,ESS)]
 
-    return θ_j, S, nEvals, eval_collect
+    end
+    if collect_evals
+        return θ_j, S, nEvalS, nEval, ESS_vec, eval_collect
+    else
+        return θ_j, S, nEvalS, nEval, ESS_vec
+    end
 end
 
 function transitional_mcmc(model::MCMCModel, setup::MCMCSetup; kargs...)

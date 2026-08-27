@@ -9,21 +9,29 @@
 using Pkg
 Pkg.activate(".")
 Pkg.instantiate()
+using Distributed, SlurmClusterManager
+
+addprocs(SlurmManager())
+@assert nworkers() == parse(Int, ENV["SLURM_NTASKS"]) "Something went wrong with the number of processes!"
 
 using Dates
 using TOML
 using Serialization
 using Plots
-
-using Distributions
 using PDMats
 using LinearAlgebra
-using BathymetryReco
-using ProgressMeter
 
-using Random
+using FFTW
+using StatsBase
+using LsqFit
 
-Random.seed!(1910)
+@everywhere begin
+    using Distributions
+    using BathymetryReco
+    using Random
+
+    Random.seed!(1910)
+end
 
 ENV["GKSwstype"]="nul"
 
@@ -94,18 +102,69 @@ plot!(ps, obs_data.t, obs_data.H; label=reshape(["Sensor $i" for i in obs_config
 
 # define forward model
 solver = swe_solver(sim_config)
-forward_model(params) = simulation(params, solver, obs_data)
+forward_model_uncorrelated(params) = simulation(params, solver, obs_data, correlated=false)
+forward_model_correlated(params) = simulation(params, solver, obs_data, correlated=true)
 
 # Defining likelihood distribution
 likelihood_σ = mcmc_config.likelihood_σ
 if likelihood_σ == 0.0
-    flat_signal = forward_model(zeros(mcmc_config.dim))
-    likelihood_σ = vec(std(obs_data.H .- flat_signal, dims=1)) # set to std of flat signal residuals
-    println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
+    flat_signal = forward_model_uncorrelated(zeros(mcmc_config.dim))
+    residual = obs_data.H .- flat_signal
+    likelihood_σ = vec(std(residual, dims=1)) # set to std of flat signal residuals
+    spatial_cov_mat = cov(residual)
+        println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
 end
 
-println("Using $(likelihood_σ) std for Likelihood distribution.")
-likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2))
+timesteps = length(obs_data.t)
+
+acf = autocor(residual, 0:timesteps-1)
+# estimate dominant frequency of the residual signal for correlation fit initial guess
+Rf = fft(residual )#.- mean(residual))
+Sf = abs.(Rf).^2
+
+# positive frequencies only
+idx = 1:div(timesteps,2)
+
+max_fr_id = argmax(Sf[idx, :], dims=1)
+
+freqs = fftfreq(timesteps, 1/sim_config.timestep)
+fr = [freqs[idx[id_max[1]]] for id_max in max_fr_id]
+
+# kernel model for time correlation
+# damped oscillation model
+damped_oscillation(τ, p) = exp.(-abs.(τ)./p[1]) .* cos.(2π*p[2].*τ)
+paper_oscillator(τ, p) = exp.(-abs.(τ).*p[1]) .* (cos.(p[2].*τ) + p[1]/p[2] .*sin.(p[2].*abs.(τ)))
+
+p0 = [2.0, mean(fr)] # initial guess for parameters
+
+p_mean = zeros(length(p0))
+p_pap = zeros(length(p0))
+# fit the model to each column of the autocorrelation function
+for r in eachcol(acf)
+    p_fit = curve_fit(damped_oscillation, obs_data.t, r, p0)
+    println("Fitted parameters for residual: $(p_fit.param)")
+    global p_mean += p_fit.param
+end
+
+for r in eachcol(acf)
+    p_fit = curve_fit(paper_oscillator, obs_data.t, r, p0)
+    println("Fitted parameters for residual: $(p_fit.param)")
+    global p_pap += p_fit.param
+end
+
+p_mean = p_mean ./ size(residual, 2)
+p_pap = p_pap ./ size(residual, 2)
+
+C_temporal = damped_oscillation(obs_data.t .- obs_data.t', p_mean)
+C_pap = paper_oscillator(obs_data.t .- obs_data.t', p_pap)
+C_spatial = spatial_cov_mat
+
+C_total = kron(C_spatial, C_temporal)
+C_tot_pap = kron(C_spatial, C_pap)
+
+residual = vec(residual)
+
+likelihood_dist = MvNormal(zeros(length(residual)), PDMat(C_total))
 
 # define prior distributions
 prior_dist = Vector{Distribution}()
@@ -126,7 +185,7 @@ toml_config["sampler"]["likelihood_var"] = likelihood_σ
 pos = Posterior(prior_dist, likelihood_dist)
 # proposal only needed to fit with the MCMCModel type but not needed in TMCMC
 proposal = Normal(0.0,0.0)
-model = MCMCModel(pos, forward_model, obs_data, proposal)
+model = MCMCModel(pos, forward_model_correlated, obs_data, proposal)
 
 # Define initial parameters
 init_θ = mcmc_config.initial_θ
@@ -137,17 +196,21 @@ if isempty(init_θ)
     else
         mv_idx = isa.(pos.prior,MvNormal)
         init_θ = rand(pos.prior[.!mv_idx][1],(mcmc_config.n,mcmc_config.dim))
-        #init_θ .+= transpose(rand(p,(mcmc_config.n)))
         init_θ *= pos.prior[mv_idx][1].Σ
+        maxV = [maximum(abs.(r)) for r in eachrow(init_θ)]
+        fac = ones(size(maxV))
+        fac[maxV .>  0.3] = maxV[maxV .>  0.3] .* 0.3./maxV[maxV .>  0.3]
+        init_θ .*= fac
     end 
 
     toml_config["sampler"]["init"] = init_θ
     xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
     inip = plot(xs, init_θ[1,:], label="Initial sample $(1)",legend=:outerright)
-    for i = 2:10
+    for i = 2:20
         plot!(inip,xs, init_θ[i,:], label="Initial sample $(i)")
     end
     display(inip)
+    savefig(inip, "initial_samples.png")
 
 end
 println("#############################")
@@ -158,14 +221,20 @@ println("#############################")
 ###############################################################################
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
-final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=true, logging=Progress(mcmc_config.n))
+time_stat = @timed begin
+    final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+end
 
 println("TMCMC finished \n#############################" )
 
 ###############################################################################
 # Store the chains and create diagnostic plots                                #
 ###############################################################################
+nW = nprocs()
+
+rmprocs(workers())
 import StatsPlots
+using JLD
 
 if store_exp
     mkpath(target_dir)
@@ -178,6 +247,16 @@ if store_exp
     open("./experiment_config.toml", "w") do io
         TOML.print(io, toml_config)
     end
+
+    # save timings
+    time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nprocs())
+    open("./timings.toml", "w") do io
+        TOML.print(io, Dict("time_summary" => time_dict))
+    end
+
+    # save samples
+    @save "./final_parameters.jld" final_parameters
 
     pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)
     StatsPlots.errorline!(pPlume, xs, final_parameters', errorstyle=:plume, label="Reconstruction")

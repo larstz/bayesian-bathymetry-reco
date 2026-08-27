@@ -8,10 +8,11 @@
 
 using Pkg
 Pkg.activate(".")
-#Pkg.instantiate()
-using Distributed
+Pkg.instantiate()
+using Distributed, SlurmClusterManager
 
-addprocs(4)
+addprocs(SlurmManager())
+@assert nworkers() == parse(Int, ENV["SLURM_NTASKS"]) "Something went wrong with the number of processes!"
 
 using Dates
 using TOML
@@ -165,7 +166,7 @@ println("#############################")
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
 time_stat = @timed begin
-    final_parameters, S = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+    final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
 end
 
 println("TMCMC finished \n#############################" )
@@ -193,7 +194,7 @@ if store_exp
 
     # save timings
     time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
-                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nprocs())
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW)
     open("./timings.toml", "w") do io
         TOML.print(io, Dict("time_summary" => time_dict))
     end
