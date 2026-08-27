@@ -194,14 +194,15 @@ if store_exp
 
     # save timings
     time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
-                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval)
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval, "ESS_final" => ESS[end][2])
     open("./timings.toml", "w") do io
         TOML.print(io, Dict("time_summary" => time_dict))
     end
 
     # save samples
     @save "./final_parameters.jld" final_parameters
-
+    @save "./ESS.jld" ESS
+    
     pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)
     StatsPlots.errorline!(pPlume, xs, final_parameters', errorstyle=:plume, label="Reconstruction")
     #plot!(pPlume, xs, mean_init_θ, label="Mean initialization", lw=4)

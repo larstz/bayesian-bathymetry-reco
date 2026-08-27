@@ -214,7 +214,9 @@ println("#############################")
 ###############################################################################
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
-final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=true, logging=Progress(mcmc_config.n))
+time_stat = @timed begin
+    final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+end
 
 println("TMCMC finished \n#############################" )
 
@@ -222,6 +224,7 @@ println("TMCMC finished \n#############################" )
 # Store the chains and create diagnostic plots                                #
 ###############################################################################
 import StatsPlots
+using JLD
 
 if store_exp
     mkpath(target_dir)
@@ -234,6 +237,17 @@ if store_exp
     open("./experiment_config.toml", "w") do io
         TOML.print(io, toml_config)
     end
+
+    # save timings
+    time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => 1, "nEval" => nEval, "ESS_final" => ESS[end][2])
+    open("./timings.toml", "w") do io
+        TOML.print(io, Dict("time_summary" => time_dict))
+    end
+
+    # save samples and ESS
+    @save "./final_parameters.jld" final_parameters
+    @save "./ESS.jld" ESS
 
     pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)
     StatsPlots.errorline!(pPlume, xs, final_parameters', errorstyle=:plume, label="Reconstruction")

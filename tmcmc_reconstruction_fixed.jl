@@ -180,14 +180,15 @@ if store_exp
 
     # save timings
     time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
-                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval)
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval, "ESS_final" => ESS[end][2])
     open("./timings.toml", "w") do io
         TOML.print(io, Dict("time_summary" => time_dict))
     end
 
     # save samples
     @save "./final_parameters.jld" final_parameters
-
+    @save "./ESS.jld" ESS
+    
     savefig(inip, "initial_samples.png")
     scatter!(inip,final_parameters[:,1], final_parameters[:,2], label="Final samples", title="Final samples", xlabel="Parameter 1", ylabel="Parameter 2")  
     savefig(inip, "final_samples.png")
