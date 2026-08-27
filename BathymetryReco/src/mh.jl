@@ -412,9 +412,9 @@ function transitional_mcmc(
 
     end
     if collect_evals
-        return θ_j, S, nEvalS, nEval, ESS_vec, eval_collect
+        return θ_j, S, nEvals, ESS_vec, eval_collect
     else
-        return θ_j, S, nEvalS, nEval, ESS_vec
+        return θ_j, S, nEvals, ESS_vec
     end
 end
 
