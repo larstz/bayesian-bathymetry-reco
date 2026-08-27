@@ -13,6 +13,7 @@ using Distributed, SlurmClusterManager
 
 addprocs(SlurmManager())
 @assert nworkers() == parse(Int, ENV["SLURM_NTASKS"]) "Something went wrong with the number of processes!"
+@info("Running TMCMC inference with a total of $(parse(Int, ENV["SLURM_NTASKS"])) workers!")
 
 using Dates
 using TOML
