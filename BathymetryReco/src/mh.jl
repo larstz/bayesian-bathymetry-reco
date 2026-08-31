@@ -310,7 +310,7 @@ function transitional_mcmc(
 
     #
     S = 0.0
-    ESS_vec = [(β_j,n)]
+    ESS_vec = [(Float64.(β_j),Float64.(n))]
     ancestry = Vector{Vector{Int}}()
 
     while β_j < 1
