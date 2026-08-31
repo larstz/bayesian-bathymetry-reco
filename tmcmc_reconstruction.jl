@@ -167,7 +167,7 @@ println("#############################")
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
 time_stat = @timed begin
-    final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+    final_parameters, S, nEval, ESS, ESS_final, lineage = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
 end
 
 println("TMCMC finished \n#############################" )
@@ -195,13 +195,14 @@ if store_exp
 
     # save timings
     time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
-                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval, "ESS_final" => ESS[end][2])
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => nW, "nEval" => nEval, "ESS_last" => ESS[end][2], "ESS_final" => ESS_final)
     open("./timings.toml", "w") do io
         TOML.print(io, Dict("time_summary" => time_dict))
     end
 
     # save samples
     @save "./final_parameters.jld" final_parameters
+    @save "./lineage.jld" lineage
     @save "./ESS.jld" ESS
     
     pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)

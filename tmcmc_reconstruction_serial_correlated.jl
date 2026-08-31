@@ -83,7 +83,7 @@ target_dir = joinpath(io_config.output_dir,
                       "prior-"*join(prior_settings.type,"-"),
                       "proposal-"*proposal_settings.type * "-" * proposal_settings.kernel,
                       "stepsize-"*join(string.(mcmc_config.γ),"-"),
-                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)_tmcmc")
+                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)_tmcmc_correlated")
 
 println("Storing results in: $target_dir")
 
@@ -215,7 +215,7 @@ println("#############################")
 println("Start TMCMC with $(mcmc_config.n) samples: \n#############################" )
 
 time_stat = @timed begin
-    final_parameters, S, nEval, ESS = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
+    final_parameters, S, nEval, ESS, ESS_final, lineage = transitional_mcmc(model, mcmc_config, init_θ, verbose=false, parallel_eval=true)
 end
 
 println("TMCMC finished \n#############################" )
@@ -240,13 +240,14 @@ if store_exp
 
     # save timings
     time_dict = Dict("time" => time_stat.time, "gctime" => time_stat.gctime, "bytes" => time_stat.bytes, "compile_time" => time_stat.compile_time,
-                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => 1, "nEval" => nEval, "ESS_final" => ESS[end][2])
+                    "recompile_time" => time_stat.recompile_time, "lock_conflicts" => time_stat.lock_conflicts, "nprocs" => 1, "nEval" => nEval, "ESS_last" => ESS[end][2], "ESS_final" => ESS_final)
     open("./timings.toml", "w") do io
         TOML.print(io, Dict("time_summary" => time_dict))
     end
 
     # save samples and ESS
     @save "./final_parameters.jld" final_parameters
+    @save "./lineage.jld" lineage
     @save "./ESS.jld" ESS
 
     pPlume = plot(;title="Parameter & uncertainity", xlabel="x", ylabel="H", legend=:outerright)

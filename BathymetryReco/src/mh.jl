@@ -311,6 +311,8 @@ function transitional_mcmc(
     #
     S = 0.0
     ESS_vec = [(β_j,n)]
+    ancestry = Vector{Vector{Int}}()
+
     while β_j < 1
         j += 1
         (verbose) && print("step $(j) - current β=$(β_j)! \n")
@@ -322,6 +324,7 @@ function transitional_mcmc(
         S += (log(Statistics.mean(w_j)) + (β_j⁺ - β_j) * adjust)
         weights = StatsBase.FrequencyWeights(w_j ./ sum(w_j))
         idx = StatsBase.sample(collect(1:(n)), weights, n; replace=true)
+        push!(ancestry, copy(idx))
         θ_j⁺ = θ_j[idx, :]
         Cov_j = tmcmc_β^2 * cov(covariance_method, θ_j⁺)
 
@@ -408,13 +411,16 @@ function transitional_mcmc(
         end
 
         ESS = (sum(w_j))^2 / sum(w_j.^2)
-        ESS_vec = [(β_j,ESS)]
+        push!(ESS_vec, (β_j,ESS))
 
     end
+
+    ESS_final, lineage = genealogical_ess(ancestry, n)
+
     if collect_evals
-        return θ_j, S, nEvals, ESS_vec, eval_collect
+        return θ_j, S, nEvals, ESS_vec, ESS_final, lineage, eval_collect
     else
-        return θ_j, S, nEvals, ESS_vec
+        return θ_j, S, nEvals, ESS_vec, ESS_final, lineage
     end
 end
 
@@ -464,4 +470,16 @@ function _beta_and_weights(β::Real, L::AbstractVector{<:Real})
     end
 
     return x, w
+end
+
+
+# 
+function genealogical_ess(ancestry, n)
+    # lineage[i] = which stage-0 particle final particle i descends from
+    lineage = collect(1:n)
+    for idx in ancestry
+        lineage = lineage[idx]   # compose resampling maps, stage by stage
+    end
+    n_distinct_roots = length(unique(lineage))
+    return n_distinct_roots, lineage
 end

@@ -4,11 +4,13 @@ using Serialization
 using MCMCChains
 using Distributions
 using Distributed
+using JLD
+using TOML
 
 parallel = true
 
 if parallel
-    addprocs(32)
+    addprocs(17)
     @everywhere begin
         using BathymetryReco
     end
@@ -19,12 +21,15 @@ end
 
 println("#############################\nRead in chain" )
 
-exp = "data/results/heat_tests/mean_tests/sensor-2-3-4/prior-sparse/proposal-rw/stepsize-0.001/2026-06-02-09-09-56_mean_heat_with_tmcmc" #ARGS[1]
+exp = "data/results/tmcmc/discretized/tmcmc_results_1k/mean_heat_wb_tmcmc_32p" #ARGS[1]
 ani = false
 include_adjoint = false
 plot_sensor_simulation = false
 appendix = ""
-chain = deserialize(joinpath(exp, "chain_1.jls"))
+tmcmc_samples = load(joinpath(exp,"final_parameters.jld"))
+bathy_tmcmc = tmcmc_samples["final_parameters"]
+tmcmc_config = TOML.parsefile(joinpath(exp,"timings.toml"))
+tmcmc_config = tmcmc_config["time_summary"]
 
 config = load_config(joinpath(exp, "experiment_config.toml"))
 sim_config = config.sim_params
@@ -46,12 +51,10 @@ else
     forward(params) = simulation(params, sim_config, obs_data)
 end
 
-burnin = 1000
-sample_number = size(chain,1) - burnin
+burnin = 0
+sample_number = size(bathy_tmcmc,1) - burnin
 
-bathy = chain[burnin+1:burnin+sample_number,1:mcmc_config.dim]
-lp = chain[burnin+1:burnin+sample_number,mcmc_config.dim+1]
-ar = chain[burnin+1:burnin+sample_number,end]
+bathy = bathy_tmcmc[burnin+1:burnin+sample_number,1:mcmc_config.dim]
 
 sensor_simulations = Array{Float64}(undef, sample_number, length(obs_data.t), length(obs_data.x))
 
@@ -64,7 +67,7 @@ if parallel
     end
 else
     for i in 1:sample_number
-        println("Simulating for sample ", i, " with log-posterior ", lp[i], " and acceptance rate ", ar[i])
+        println("Simulating for sample ", i)
         sim = forward(bathy[i, :])
         sensor_simulations[i, :, :] = sim
     end
