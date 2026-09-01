@@ -113,12 +113,16 @@ likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2
 
 # define prior distributions
 prior_dist = Vector{Distribution}()
-for prior_type in lowercase.(prior_settings.type)
+for (i,prior_type) in enumerate(lowercase.(prior_settings.type))
     if prior_type == "smooth"
         smooth_kernel = SqExpMvNormal(mcmc_config.dim, prior_settings.lengthscale, prior_settings.var)
         push!(prior_dist, MvNormal(smooth_kernel))
     elseif prior_type == "sparse"
         push!(prior_dist, Cauchy(prior_settings.loc, prior_settings.scale))
+    elseif prior_type == "normal"
+        push!(prior_dist, Normal(prior_settings.loc[i], prior_settings.scale[i]))
+    elseif prior_type == "uniform"
+        push!(prior_dist, Uniform(prior_settings.loc[i], prior_settings.scale[i]))
     end
 end
 println("Using prior distribution: $(prior_settings.type)")
@@ -138,6 +142,8 @@ if isempty(init_θ)
     #init_θ = zeros(mcmc_config.n,mcmc_config.dim) # using only zero vectors does not make sense for tmcmc
     if length(prior_dist) == 1
         init_θ = rand(prior_dist[1],(mcmc_config.n,mcmc_config.dim))
+    elseif any(isa.(pos.prior,Uniform)) || any(isa.(pos.prior,Normal))
+        init_θ = reduce(hcat,[rand(p,mcmc_config.n) for p in prior_dist])
     else
         mv_idx = isa.(pos.prior,MvNormal)
         init_θ = rand(pos.prior[.!mv_idx][1],(mcmc_config.n,mcmc_config.dim))
