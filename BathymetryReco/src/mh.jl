@@ -184,7 +184,7 @@ function logjoint(model::MCMCModel, θ)
         return log_prior + log_likelihood, log_likelihood, log_prior
     catch err
         if isa(err, DimensionMismatch) || isa(err, BoundsError)
-            println("Dimension mismatch or bounds error in forward model / likelihood.")
+            println("Forward model / likelihood evaluation failed; rejecting proposal.")
             println("Current parameters: ", θ)
             return -Inf, -Inf, log_prior
         else
@@ -215,11 +215,25 @@ function sample_chain(
     chain[1, :] = [θ..., lpost, ll, lp, 1.0]
     acceptance_rate = 1.0
     accepted = 1
+
+    prop_dist = model.proposal
     for i = 1:n
-        θ_new = proposal(θ, model.proposal)
+        if i == burn_in
+            up_cov = cov(chain[1:burn_in, 1:length(initial_θ)])
+            prop_dist = RandomWalkProposal(1.0, PDMat(up_cov))
+        end
+        θ_new = proposal(θ, prop_dist)
         lpost_new, ll_new, lp_new = logjoint(model, θ_new)
 
-        if (rand()) < exp(lpost_new - lpost)
+        log_alpha = lpost_new - lpost
+
+        if prop_dist isa pCNProposal
+            if all(p -> p isa MvNormal, model.posterior.prior)
+                log_alpha = ll_new - ll
+            end
+        end
+
+        if (rand()) < exp(log_alpha)
             accepted += 1
             θ = θ_new
             lpost = lpost_new

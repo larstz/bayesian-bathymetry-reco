@@ -19,7 +19,7 @@ add_theme(:custom, PlotTheme(
     titlefontsize = 8,
     framestyle = :box,
     label = nothing,
-    margin = 0mm,
+    margin = 4pt,
     size = (textwidth, plot_height),  # 390pt width for PDF
     dpi=72
 ))
@@ -36,7 +36,7 @@ add_theme(:custom_slides, PlotTheme(
     titlefontsize = 8*scale,
     framestyle = :box,
     label = nothing,
-    margin = 0mm,
+    margin = 4pt,
     size = (textwidth, plot_height),  # 390pt width for PDF
     dpi=72
 ))

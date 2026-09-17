@@ -17,7 +17,7 @@ println("Added $(nworkers()) workers.")
     using BathymetryReco
 end
 
-config_file = abspath("paper_configs/parametrized/experiment_config.toml")
+config_file = abspath("paper_configs/parametrized/parameterized_normal_prior_config.toml")
 toml_config = TOML.parsefile(config_file)
 config = load_config(toml_config)
 sim_config = config.sim_params
@@ -99,12 +99,14 @@ model = MCMCModel(pos, forward_model, obs_data, Normal(0,1))
 @everywhere begin
     μs = LinRange(1.5,12.5,23)
     σs = LinRange(0.01, 0.5, 50)
+    hs = LinRange(0.0, 0.295, 25)
     p_grid = [[μ, σ] for μ in μs for σ in σs]
+    p_grid_h = [[μ, 0.05 ,h] for μ in μs for h in hs]
 end
 
-println("Grid size: ", length(p_grid))
+println("Grid size: ", length(p_grid_h))
 
-lps = pmap(p->logjoint(model, p), p_grid)
+lps = pmap(p->logjoint(model, p), p_grid_h)
 
 mkpath(target_dir)
 cd(target_dir)
@@ -113,6 +115,7 @@ serialize("log_posterior_values.jls", lps)
 # Save the grid points
 serialize("log_posterior_grid_ms.jls", μs)
 serialize("log_posterior_grid_ss.jls", σs)
+serialize("log_posterior_grid_hs.jls", hs)
 open("./experiment_config.toml", "w") do io
     TOML.print(io, toml_config)
 end

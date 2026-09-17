@@ -36,7 +36,7 @@ ENV["GKSwstype"]="nul"
 
 println("#############################\nRead in config file" )
 if isempty(ARGS)
-    config_file = abspath("./width_test_configs/config_1.toml")
+    config_file = abspath("thesis_configs/discretized/mean_heat_config.toml")
 else
     config_file = abspath(ARGS[1])
 end
@@ -83,9 +83,10 @@ target_dir = joinpath(io_config.output_dir,
                       exp_type,
                       "sensor-"*join(obs_config.sensor_id, "-"),
                       "prior-"*join(prior_settings.type,"-"),
-                      "proposal-"*proposal_settings.type,
+                      "proposal-"*proposal_settings.type * "-" * proposal_settings.kernel,
                       "stepsize-"*join(string.(mcmc_config.γ),"-"),
-                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
+                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))",
+                      "$(exp_name)")
 
 println("Storing results in: $target_dir")
 
@@ -109,11 +110,20 @@ likelihood_dist = MvNormal(zeros(size(likelihood_σ)), PDiagMat(likelihood_σ.^2
 # define prior distributions
 prior_dist = Vector{Distribution}()
 for (i, prior_type) in enumerate(mcmc_config.prior.type)
-    prior_param = [mcmc_config.prior.loc[i], mcmc_config.prior.scale[i]]
+
+    println("Using prior: $prior_type")
+    if mcmc_config.dim < 5
+         prior_param = [mcmc_config.prior.loc[i], mcmc_config.prior.scale[i]]
+    end
     if prior_type == "normal"
         push!(prior_dist, Normal(prior_param...))
     elseif prior_type == "uniform"
         push!(prior_dist, Uniform(prior_param...))
+    elseif prior_type == "smooth"
+        smooth_kernel = SqExpMvNormal(mcmc_config.dim, prior_settings.lengthscale, prior_settings.var)
+        push!(prior_dist, MvNormal(smooth_kernel))
+    elseif prior_type == "sparse"
+        push!(prior_dist, Cauchy(prior_settings.loc, prior_settings.scale))
     else
         error("Unsupported prior type: $prior_type")
     end
@@ -140,6 +150,18 @@ pos = Posterior(prior_dist, likelihood_dist)
 model = MCMCModel(pos, forward_model, obs_data, proposal)
 
 init_θ = mcmc_config.initial_θ
+if isempty(init_θ)
+    init_θ = [zeros(mcmc_config.dim) for i in 1:mcmc_config.n_chains]
+    if mcmc_config.dim > 5
+        init_prop = prior_dist[findfirst(x-> typeof(x) <: MvNormal, prior_dist)]
+        for i in 2:mcmc_config.n_chains
+            init_θ[i] = rand(init_prop)
+        end
+    end
+    toml_config["sampler"]["init"] = init_θ
+    xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
+    inip = plot(xs, init_θ)
+end
 
 ###############################################################################
 # Run parallel MCMC sampling                                                  #
@@ -147,7 +169,7 @@ init_θ = mcmc_config.initial_θ
 
 println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#############################" )
 chain = pmap(1:mcmc_config.n_chains) do i
-    sample_chain(model, mcmc_config, init_θ[i])
+    sample_chain(model, mcmc_config, init_θ[i], burn_in=mcmc_config.burn_in)
 end
 println("Chains finished \n#############################" )
 
@@ -189,4 +211,8 @@ if store_exp
     savefig(pll, "loglikelihood.png")
     savefig(plprior, "logprior.png")
     savefig(pla, "acceptance_rate.png")
+
+    if mcmc_config.dim > 5
+        savefig(inip, "initial_bathy.png")
+    end
 end

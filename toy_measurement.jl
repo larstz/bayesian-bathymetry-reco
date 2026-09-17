@@ -9,7 +9,6 @@ using DataInterpolations
 
 cd(@__DIR__)
 
-#TODO pass config file as command line argument
 config_file = ARGS[1]
 config = TOML.parsefile(config_file)
 sim_config = read_simulation_parameters(config["simulation"])
@@ -38,8 +37,13 @@ npeaks = bathy_config.n_peaks
 bathy = zero(x)
 
 if problem_bathy == "gaussian"
-    param_tuples =  length(bathy_params)/2 == npeaks ?
-    [[bathy_params[i], bathy_params[i+1]] for i in 1:2:length(bathy_params)] : println("Number of peaks and number of parameters doesn't match!")
+    if length(bathy_params)/2 == npeaks
+        param_tuples = [[bathy_params[i], bathy_params[i+1]] for i in 1:2:length(bathy_params)]
+    elseif length(bathy_params)/3 == npeaks
+        param_tuples = [[bathy_params[i], bathy_params[i+1], bathy_params[i+2]] for i in 1:3:length(bathy_params)]
+    else
+        println("Number of peaks and number of parameters doesn't match!")
+    end
     for params in param_tuples
        global bathy += bathymetry(x, params)
     end
@@ -78,7 +82,11 @@ if io_config.save
 
     if problem_bathy == "gaussian"
         sim_details_path = "$bathy_params"
-        sim_details_path = "$bathy_params"
+        mkpath(sim_details_path)
+        cd(sim_details_path)
+    end
+    if problem_bathy == "random"
+        sim_details_path = "random_bathy"
         mkpath(sim_details_path)
         cd(sim_details_path)
         savefig(pb, "sample_bathymetry.png")

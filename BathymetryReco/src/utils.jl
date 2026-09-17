@@ -370,7 +370,7 @@ function read_mcmc_parameters(config::Dict{String,Any})
     γ = config["stepsize"]
     burn_in = config["burn_in"]
     likelihood_σ = config["likelihood_var"]
-    init = config["initial"]
+    init = config["init"]
     # Convert Vector{Any} to Vector{Vector{Float64}} for Julia 1.12 TOML compatibility
     if init isa Vector{Any}
         init = Vector{Float64}[Vector{Float64}(x) for x in init]
@@ -450,8 +450,8 @@ export read_bathymetry_parameters
 Read the bathymetry parameters from a dictionary (parsed from a TOML file) and return a `BathymetrySetup` struct containing the bathymetry parameters.
 """
 function read_bathymetry_parameters(config::Dict{String,Any})
-    params = get(config, :parameters, [])
-    npeaks = get(config, :n_peaks, 0)
+    params = get(config, "parameters", [])
+    npeaks = get(config, "npeaks", 0)
     bathy_params = BathymetrySetup(params, npeaks)
     return bathy_params
 end

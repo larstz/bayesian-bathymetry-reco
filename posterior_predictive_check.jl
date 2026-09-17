@@ -19,7 +19,7 @@ end
 
 println("#############################\nRead in chain" )
 
-exp = "data/results/heat_tests/mean_tests/sensor-2-3-4/prior-smooth-sparse/proposal-rw/stepsize-0.001/2026-02-09-13-53-04_mean_heat_wb" #ARGS[1]
+exp = ARGS[1]
 ani = false
 include_adjoint = false
 plot_sensor_simulation = false
@@ -47,7 +47,7 @@ else
 end
 
 burnin = 1000
-sample_number = size(chain,1) - burnin
+sample_number = 50000#size(chain,1) - burnin
 
 bathy = chain[burnin+1:burnin+sample_number,1:mcmc_config.dim]
 lp = chain[burnin+1:burnin+sample_number,mcmc_config.dim+1]

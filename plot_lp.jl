@@ -28,7 +28,7 @@ function common_colorrange(mats...)
     mins = Float64[]
     maxs = Float64[]
     for mat in mats
-        mat_min, mat_max = finite_minmax(mat[:, 1:50])
+        mat_min, mat_max = finite_minmax(mat[:, :])
         println("Matrix min: ", mat_min, " max: ", mat_max)
         push!(mins, mat_min)
         push!(maxs, mat_max)
@@ -39,7 +39,7 @@ end
 println("Read in data from disk")
 
 cwd = pwd()
-lp_experiment = ARGS[1]
+lp_experiment = "data/results/lp_scan/lp_scan_2026-08-31-14-36-47"#ARGS[1]
 
 test_prior = true
 
@@ -53,14 +53,37 @@ ylims = (0.01, 0.5)
 lps = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),1)
 lls = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),2)
 prs = getindex.(deserialize(joinpath(lp_experiment, "log_posterior_values.jls")),3)
-μs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ms.jls"))
-σs = deserialize(joinpath(lp_experiment, "log_posterior_grid_ss.jls"))
-p_grid = hcat([[μ, σ] for μ in μs for σ in σs]...)
+ps = deserialize(joinpath(lp_experiment, "log_posterior_grid_ms.jls"))
+ws = deserialize(joinpath(lp_experiment, "log_posterior_grid_ss.jls"))
+hs = [0.2]
 
-lp_mat = permutedims(reshape(lps, length(σs), length(μs)))./scale_vals
+if isfile(joinpath(lp_experiment, "log_posterior_grid_hs.jls"))
+   hs = deserialize(joinpath(lp_experiment, "log_posterior_grid_hs.jls"))
+else
+    println("No h grid found, using default value of 0.2")
+end
+
+if length(unique(hs)) == 1
+    ylabel= latexstring("b_w")
+    ys = ws
+else
+    ylabel= latexstring("b_h")
+    ys = hs
+    ylims = (0.01, 0.3)
+end
+
+p_grid = hcat([[μ, σ] for μ in ps for σ in ys]...)
+
+println("Grid size: ", size(p_grid))
+println("size of ys: ", size(ys))
+
+lp_mat = permutedims(reshape(lps, length(ys), length(ps)))./scale_vals
 #replace -Inf with NaN
 lp_mat[lp_mat .== -Inf] .= NaN
-ll_mat = permutedims(reshape(lls, length(σs), length(μs)))./scale_vals
+ll_mat = permutedims(reshape(lls, length(ys), length(ps)))./scale_vals
+
+marginal_p = vec(log.(sum(exp.(ll_mat), dims=2)))
+marginal_w = vec(log.(sum(exp.(ll_mat), dims=1)))
 
 priors = [[Uniform(1.5, 12.5), Uniform(0.0, 1.0)],
           [Normal(4.0, 0.1), Uniform(0.0, 1.0)],
@@ -70,7 +93,7 @@ lp_test_mats = []
 if test_prior
     for prior in priors
         prior_vals = get_prior(prior, p_grid)
-        pr_mat_test = permutedims(reshape(prior_vals, length(σs), length(μs)))
+        pr_mat_test = permutedims(reshape(prior_vals, length(ys), length(ps)))
         lp_test_mat = pr_mat_test./scale_vals .+ ll_mat
         push!(lp_test_mats, lp_test_mat)
     end
@@ -84,16 +107,26 @@ levels = range(common_cr[1], common_cr[2], length=50)
 println("Plotting log-posterior")
 f = Figure()
 ax = Axis(f[1, 1]; title=latexstring("\\log\\pi_L(H|b)+\\log\\pi_\\mathrm{Prior}(b)"), xlabel=xlabel, ylabel=ylabel, limits=(xlims, ylims), xticks=1.5:1.:12.5, yticks=[0.01,0.05:0.05:0.5...])
-cont = contourf!(ax,μs, σs, lp_mat; nan_color=:white, levels=levels)
+cont = contourf!(ax,ps, ys, lp_mat; nan_color=:white, levels=levels)
 Colorbar(f[1, 2], cont)
 Label(f[1, 2, Top()], halign=:left, text=L"\times10^3")
 
 println("Plotting log-likelihood")
 fll = Figure()
 axll = Axis(fll[1, 1]; title=latexstring("\\log\\pi_L(H|b)"), xlabel=xlabel, ylabel=ylabel, limits=(xlims, ylims),  xticks=1.5:1.:12.5, yticks=[0.01,0.05:0.05:0.5...])
-contll = contourf!(axll,μs, σs, ll_mat; nan_color=:white, levels=levels)
+contll = contourf!(axll,ps, ys, ll_mat; nan_color=:white, levels=levels)
 Colorbar(fll[1, 2], contll)
 Label(fll[1, 2, Top()], halign=:left, text=L"\times10^3")
+
+# Ploting the marginal distributions
+f_marginal_p = Figure()
+ax_marginal_p = Axis(f_marginal_p[1, 1]; xlabel=xlabel, ylabel=L"\log\pi_L(H|b_p)", limits=(xlims, (minimum(marginal_p), maximum(marginal_p))), xticks=1.5:1.:12.5)
+lines!(ax_marginal_p, ps, marginal_p)
+
+f_marginal_w = Figure()
+ax_marginal_w = Axis(f_marginal_w[1, 1]; xlabel=xlabel, ylabel=L"\log\pi_L(H|b_w)", limits=(ylims, (minimum(marginal_w), maximum(marginal_w))), xticks=[0.01,0.05:0.05:0.5...])
+lines!(ax_marginal_w, ys, marginal_w)
+
 
 test_plots = []
 if test_prior
@@ -101,7 +134,7 @@ if test_prior
         println("Plotting test log-posterior with prior")
         fpr = Figure()
         axpr = Axis(fpr[1, 1]; title=latexstring("\\log\\pi_L(H|b)+\\log\\pi_\\mathrm{Prior}(b)"), xlabel=xlabel, ylabel=ylabel, limits=(xlims, ylims),xticks=1.5:1.:12.5, yticks=[0.01,0.05:0.05:0.5...])
-        contpr = contourf!(axpr,μs, σs, lp_test; nan_color=:white, levels=levels, extendlow=:auto)
+        contpr = contourf!(axpr,ps, ys, lp_test; nan_color=:white, levels=levels, extendlow=:auto)
         Colorbar(fpr[1, 2], contpr)
         Label(fpr[1, 2, Top()], halign=:left, text=L"\times10^3")
         push!(test_plots, [fpr])
@@ -114,6 +147,12 @@ save("log_posterior.pdf", f; pt_per_unit)
 
 save("log_likelihood.png", fll)
 save("log_likelihood.pdf", fll; pt_per_unit)
+
+save("marginal_b_p.png", f_marginal_p)
+save("marginal_b_p.pdf", f_marginal_p; pt_per_unit)
+
+save("marginal_b_w.png", f_marginal_w)
+save("marginal_b_w.pdf", f_marginal_w; pt_per_unit)
 
 if test_prior
     for (i, fpr) in enumerate(test_plots)
@@ -160,7 +199,7 @@ if length(ARGS) == 2
     println("Plotting max posterior")
     _, idmax = max_lps[plot_id]
     println("Max Posterior: ", idmax)
-    max_p = [μs[idmax[1]], σs[idmax[2]]]
+    max_p = [ps[idmax[1]], σs[idmax[2]]]
     println("Max Posterior: ", max_p)
     scatter!(f_chn.content[1], max_p[1], max_p[2], color=:black, markersize=5)
     chain_elem = [LineElement(color=line_colors[i], linestyle=nothing,

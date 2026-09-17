@@ -72,13 +72,14 @@ end
 store_exp = io_config.save
 exp_name = split(splitpath(obs_config.path)[end], ".")[1]
 # Directory structure for storing results experiment/sensors/prior/proposal/stepsize/timestamp_expname
+run_id = "$(get(ENV, "SLURM_ARRAY_TASK_ID", "0"))"
 target_dir = joinpath(io_config.output_dir,
                       exp_type,
                       "sensor-"*join(obs_config.sensor_id, "-"),
                       "prior-"*join(prior_settings.type,"-"),
                       "proposal-"*proposal_settings.type * "-" * proposal_settings.kernel,
                       "stepsize-"*join(string.(mcmc_config.γ),"-"),
-                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
+                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(run_id)_$(exp_name)")
 
 println("Storing results in: $target_dir")
 
@@ -149,10 +150,18 @@ model = MCMCModel(pos, forward_model, obs_data, proposal)
 init_θ = mcmc_config.initial_θ
 if isempty(init_θ)
     init_θ = [zeros(mcmc_config.dim) for i in 1:mcmc_config.n_chains]
+    if mcmc_config.dim > 5
+        init_prop = prior_dist[findfirst(x-> typeof(x) <: MvNormal, prior_dist)]
+        for i in 2:mcmc_config.n_chains
+            init_θ[i] = rand(init_prop)
+        end
+    end
     toml_config["sampler"]["init"] = init_θ
     xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
-    inip = plot(xs, init_θ[1])
+    global inip = plot(xs, init_θ)
+
 end
+
 println("#############################")
 
 println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#############################" )

@@ -15,7 +15,7 @@ theme(:custom)
 
 println("#############################\nRead in chain" )
 
-exp = "data/results/heat_tests/mean_tests/sensor-2-3-4/prior-smooth-sparse/proposal-rw/stepsize-0.001/2026-02-09-13-53-04_mean_heat_wb" #ARGS[1]
+exp = ARGS[1]
 
 config = load_config(joinpath(exp, "experiment_config.toml"))
 sim_config = config.sim_params
@@ -38,12 +38,15 @@ mean_pred = dropdims(mean(sensor_simulations, dims=1), dims=1)
 
 rel_l2_sim_error = dropdims(sqrt.(sum((sensor_simulations .- obs_H).^2, dims=2)) ./ sqrt.(sum((obs_H).^2, dims=2)), dims=2)
 
-mean_rel_l2_sim_error = round.(mean(rel_l2_sim_error, dims=1).*100, digits=4)
+mean_rel_l2_sim_error = round.(mean(rel_l2_sim_error, dims=1).*100, digits=2)
 std_rel_l2_sim_error = round.((std(rel_l2_sim_error, dims=1))./sqrt(size(rel_l2_sim_error, 1)).*100, digits=4)
 
 for i in 1:3
     error_string = latexstring("\\varepsilon = $(mean_rel_l2_sim_error[i]) \\pm $(std_rel_l2_sim_error[i])\\%")
-
+    legend=true
+    if i>1
+        legend=false
+    end
     sensor_chain = sim_chains[:,:,i]
     n_eff = ess(sensor_chain)[:, :ess]
     se = mcse(sensor_chain)[:, :mcse]
@@ -54,9 +57,36 @@ for i in 1:3
 
     ribbon = (mean_pred[:,i] .- ci_low, ci_high .- mean_pred[:,i])
     ppc_plot = plot(;xlabel= L"t\, [\mathrm{s}]", ylabel= L"H\, [\mathrm{m}]")
-    plot!(ppc_plot, obs_data.t, obs_data.H[:,i]; title="Sensor $(i+1), "*error_string, label="measurement", linestyle=:dash)
-    plot!(ppc_plot, obs_data.t, mean_pred[:,i]; ribbon=ribbon, label="mean prediction with 95% CI", linestyle=:dot, linewidth=2)
+    plot!(ppc_plot, obs_data.t, obs_data.H[:,i]; title="Sensor $(i+1), "*error_string, label="measurement", linestyle=:dash, size=(textwidth, plot_height), ylims=(0.294, 0.31))
+    plot!(ppc_plot, obs_data.t, mean_pred[:,i]; ribbon=ribbon, label="mean ± 95% CI", linestyle=:dot, linewidth=2)
+    plot!(legend=legend)
     #scatter!(ppc_plot, obs_data.t, mean_pred[:,i], yerror=se, alpha=0.3, color=:blue)
     savefig(ppc_plot, joinpath(exp, "plots/MCMC_sim_chain_sensor_$(i+1)_ci.png"))
     savefig(ppc_plot, joinpath(exp, "plots/MCMC_sim_chain_sensor_$(i+1)_ci.pdf"))
+end
+
+t_frame_id = obs_data.t .>= 2.5
+for i in 1:3
+    error_string = latexstring("\\varepsilon = $(mean_rel_l2_sim_error[i]) \\pm $(std_rel_l2_sim_error[i])\\%")
+    if i>1
+        legend=false
+    end
+    sensor_chain = sim_chains[:,:,i]
+    n_eff = ess(sensor_chain)[:, :ess]
+    se = mcse(sensor_chain)[:, :mcse]
+    t_d = [quantile(TDist(n_e - 1), 0.975) for n_e in n_eff]
+    se = se .* t_d
+    ci_low = hpd(sensor_chain)[:, :lower]
+    ci_high = hpd(sensor_chain)[:, :upper]
+
+    ribbon = (mean_pred[:,i] .- ci_low, ci_high .- mean_pred[:,i])
+    ppc_plot = plot(;title="Sensor $(i+1), "*error_string, xlabel= L"t\, [\mathrm{s}]", ylabel= L"H\, [\mathrm{m}]")
+    plot!(ppc_plot, obs_data.t[t_frame_id], obs_data.H[t_frame_id,i]; linestyle=:dash, size=(textwidth, plot_height), ylims=(0.294, 0.31))
+    plot!(ppc_plot, obs_data.t[t_frame_id], mean_pred[t_frame_id,i]; ribbon=ribbon, linestyle=:dot)
+    if i<3
+        plot!(xformatter=:none, xlabel="")
+    end
+    #scatter!(ppc_plot, obs_data.t, mean_pred[:,i], yerror=se, alpha=0.3, color=:blue)
+    savefig(ppc_plot, joinpath(exp, "plots/MCMC_sim_chain_sensor_$(i+1)_ci_framed.png"))
+    savefig(ppc_plot, joinpath(exp, "plots/MCMC_sim_chain_sensor_$(i+1)_ci_framed.pdf"))
 end
