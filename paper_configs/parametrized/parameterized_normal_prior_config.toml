@@ -15,7 +15,7 @@ bathymetry = "exact_bathy"
 sensor_position = [3.5, 5.5, 7.5]
 tinterval = 10
 g = 9.81
-bc_file = "./data/mean_heat_wb.txt"
+bc_file = "./data/experiment_data/mean_heat_wb.txt"
 tstart = 32
 
 [observation]
@@ -23,7 +23,7 @@ real_data = false
 sensor_rate = 0.01
 noise_var = 0.05
 sensor_id = [2, 3, 4]
-path = "/perm/mat/cls1557/bayesian-inference/data/simulations/toy_measurementpaper/waterchannel_exact_bathy/"
+path = "/perm/mat/cls1557/bayesian-inference/data/simulations/toy_measurement/paper/waterchannel_exact_bathy/"
 
 [sampler]
 stepsize = [0.1, 0.01]
@@ -39,6 +39,6 @@ n_chains = 6
 
 
     [sampler.prior]
-    loc = [4.0, 0.0] # loc for normal, loc for uniform is lower bound
-    type = ["normal", "uniform"]
-    scale = [0.1, 1.0] # scale for normal is std, scale for uniform is upper bound
+    loc = [4.0, 0.0, 0.0] # loc for normal, loc for uniform is lower bound
+    type = ["normal", "uniform", "uniform"]
+    scale = [0.1, 1.0, 0.3] # scale for normal is std, scale for uniform is upper bound
