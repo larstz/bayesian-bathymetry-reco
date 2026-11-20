@@ -189,7 +189,7 @@ class WaterChannelSolver(Solver):
         def hl_function(*args):
             t = args[0].data
             htemp = self.lbc.f(t + self.ic.tstart)
-            self.ic.bc_field["g"] = self.ic.H + htemp - self.ic.b['g'][0]
+            self.ic.bc_field["g"] = self.ic.H + htemp - self.ic.b_left
             return self.ic.bc_field["g"]
 
         def hl(*args, domain=self.ic.bc_field.domain, F=hl_function):
@@ -320,7 +320,7 @@ class SWESolver():
             h_list: The array of water height.
             u_list: The array of velocity.
         """
-
+        self.ic.change_space_scales(1) # set grid to initial state
         # Set the initial conditions
         self.ic.b['g'] = np.squeeze(b_array)
         self.ic.h['g'] = self.ic.H - self.ic.b['g']
@@ -333,6 +333,9 @@ class SWESolver():
         self.ic.tau2['g'] = 0.0
         self.ic.bc_field['g'] = 0.0
         self.ic.t['g'] = 0.0
+
+        # define the height at the left boundary of the solver grid
+        self.ic.b_left = float(np.squeeze(self.eval_at_sensor_positions(self.ic.b, np.array([self.xbound[0]]))))
 
         b_sensor = self.eval_at_sensor_positions(self.ic.b, sensor_pos)
         temph_sensor = self.eval_at_sensor_positions(self.ic.h, sensor_pos) + b_sensor

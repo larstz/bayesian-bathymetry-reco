@@ -79,6 +79,17 @@ struct pCNProposal <: Proposal
     C::PDMat
 end
 
+struct MaskedProposal{P} <: Proposal
+    base::P
+    fixed::Vector{Int}   # e.g. [1, 64]
+end
+
+function proposal(θ, p::MaskedProposal)
+    θ_new = proposal(θ, p.base)
+    θ_new[p.fixed] .= 0.0
+    return θ_new
+end
+
 function proposal(θ, proposal::RandomWalkProposal)
     return rand(MvNormal(θ, proposal.γ .^ 2 .* proposal.C))
 end

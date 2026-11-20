@@ -370,7 +370,7 @@ function read_mcmc_parameters(config::Dict{String,Any})
     γ = config["stepsize"]
     burn_in = config["burn_in"]
     likelihood_σ = config["likelihood_var"]
-    init = config["init"]
+    init = haskey(config, "initial") ? config["initial"] : config["init"]
     # Convert Vector{Any} to Vector{Vector{Float64}} for Julia 1.12 TOML compatibility
     if init isa Vector{Any}
         init = Vector{Float64}[Vector{Float64}(x) for x in init]

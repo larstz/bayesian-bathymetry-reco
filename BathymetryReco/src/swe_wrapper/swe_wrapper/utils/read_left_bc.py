@@ -6,16 +6,17 @@ import matplotlib.pyplot as plt
 class leftbc(object):
 
     def __init__(self, filename):
-        self.heights = []
-        time    = 0
+        self.heights, self.times = [], []
         with open(filename, 'r') as f:
             for line in f.readlines()[1:]:
                 fields = line.split(",")
                 self.heights.append(float(fields[0])/100) # convert from cm to m
-                time += 0.01 # sampling rate in seconds
+                if len(fields) >= 5:
+                    self.times.append(float(fields[4]))       # Time column [s]
         nt =  np.shape(self.heights)[0]
-        taxis = np.linspace(0.0, time, nt)
-        self.final_time = time
+        # files without a Time column (e.g. mean_bc.txt): assume samples at 0.01, 0.02, ... s
+        taxis = np.array(self.times) if self.times else 0.01 * np.arange(1, nt + 1)
+        self.final_time = taxis[-1]
         self.f = CubicSpline(taxis, self.heights)
         self.heights = np.array(self.heights)
 

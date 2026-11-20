@@ -23,5 +23,6 @@ module BathymetryReco
     include("utils.jl")
     include("bathymetry.jl")
     include("swe.jl")
+    include("error_model.jl")
     include("mh.jl")
 end
