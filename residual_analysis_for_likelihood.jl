@@ -36,10 +36,21 @@ end
 toml_config = TOML.parsefile(config_file) # load toml to modify later
 config = load_config(toml_config)
 sim_config = config.sim_params
+mcmc_config = config.mcmc_params
 obs_config = config.obs_settings
 
+# calibration runs (flat bed)
+calib_dir  = "data/experiment_data/without_bathymetry"
+calib_runs = 1:20
+calib_file(k) = joinpath(calib_dir, "Heat$(k).txt")
 
+# envelope and wave-part settings
+T_wave  = 1 / 0.35                                    # flap period [s]
+w_env   = 2 * round(Int, T_wave / sim_config.timestep / 2) + 1   # one period, odd
+s_quiet = 1e-4                                        # envelope < 0.1 mm: no wave yet
 
+out_dir = "data/results/likelihood"
+mkpath(out_dir)
 
 println("##############################\nLoad experiment data")
 
