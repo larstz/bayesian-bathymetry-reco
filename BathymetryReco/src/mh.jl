@@ -42,7 +42,7 @@ function loglikelihood(p::Posterior, θ)
     return logpdf(p.likelihood, θ')
 end
 
-export Proposal, RandomWalkProposal, pCNProposal, proposal
+export Proposal, RandomWalkProposal, pCNProposal, MaskedProposal, proposal
 abstract type Proposal end
 
 """
@@ -106,6 +106,17 @@ distribution.
 """
 function proposal(θ, proposal::Distribution)
     return θ .+ rand(proposal)
+end
+
+# Log-density of the reference measure N(0, C) w.r.t. which pCN is reversible.
+# Random-walk proposals are symmetric and need no correction.
+ref_logpdf(::Proposal, θ) = 0.0
+ref_logpdf(::Distribution, θ) = 0.0
+ref_logpdf(p::pCNProposal, θ) = logpdf(MvNormal(zeros(length(θ)), p.C), θ)
+function ref_logpdf(p::MaskedProposal{<:pCNProposal}, θ)
+    free = setdiff(eachindex(θ), p.fixed)
+    Cf = PDMat(Symmetric(Matrix(p.base.C)[free, free]))
+    return logpdf(MvNormal(zeros(length(free)), Cf), θ[free])
 end
 
 export SqExpMvNormal
@@ -219,6 +230,8 @@ function sample_chain(
     verbose = false,
     logging = Progress(n),
     burn_in = 0,
+    callback = nothing,          # f(i, chain_so_far), called every `callback_every` iterations
+    callback_every = 0,
 )
     chain = zeros(n - burn_in + 1, length(initial_θ) + 4)
     θ = initial_θ
@@ -229,20 +242,14 @@ function sample_chain(
 
     prop_dist = model.proposal
     for i = 1:n
-        if i == burn_in
-            up_cov = cov(chain[1:burn_in, 1:length(initial_θ)])
-            prop_dist = RandomWalkProposal(1.0, PDMat(up_cov))
-        end
+        # if i == burn_in
+        #     up_cov = cov(chain[1:burn_in, 1:length(initial_θ)])
+        #     prop_dist = RandomWalkProposal(1.0, PDMat(up_cov))
+        # end
         θ_new = proposal(θ, prop_dist)
         lpost_new, ll_new, lp_new = logjoint(model, θ_new)
 
-        log_alpha = lpost_new - lpost
-
-        if prop_dist isa pCNProposal
-            if all(p -> p isa MvNormal, model.posterior.prior)
-                log_alpha = ll_new - ll
-            end
-        end
+        log_alpha = (lpost_new - lpost) - (ref_logpdf(prop_dist, θ_new) - ref_logpdf(prop_dist, θ))
 
         if (rand()) < exp(log_alpha)
             accepted += 1
@@ -257,6 +264,9 @@ function sample_chain(
         end
         if verbose
             next!(logging, showvalues = [("iteration count", i)])
+        end
+        if callback !== nothing && callback_every > 0 && i % callback_every == 0 && i > burn_in
+            callback(i, @view chain[1:i-burn_in+1, :])
         end
     end
     return chain

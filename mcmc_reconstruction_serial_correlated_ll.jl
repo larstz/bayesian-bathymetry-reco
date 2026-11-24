@@ -26,8 +26,6 @@ using StatsBase
 using LsqFit
 using Random
 
-Random.seed!(1910)
-
 ENV["GKSwstype"]="nul"
 
 ###############################################################################
@@ -50,7 +48,9 @@ prior_settings = mcmc_config.prior
 proposal_settings = mcmc_config.proposal
 io_config = config.io_settings
 
-
+seed = get(toml_config["sampler"], "seed", 1910) # each chain takes different steps
+Random.seed!(seed)
+println("Random seed: $(seed)")
 
 println("##############################\nLoad experiment data")
 
@@ -74,6 +74,8 @@ end
 # Set up directory for storing results
 store_exp = io_config.save
 exp_name = split(splitpath(obs_config.path)[end], ".")[1]
+config_tag = splitext(basename(config_file))[1]
+job_tag    = haskey(ENV, "SLURM_ARRAY_JOB_ID") ? "_job$(ENV["SLURM_ARRAY_JOB_ID"])-$(ENV["SLURM_ARRAY_TASK_ID"])" : ""
 # Directory structure for storing results experiment/sensors/prior/proposal/stepsize/timestamp_expname
 target_dir = joinpath(io_config.output_dir,
                       exp_type,
@@ -81,8 +83,8 @@ target_dir = joinpath(io_config.output_dir,
                       "prior-"*join(prior_settings.type,"-"),
                       "proposal-"*proposal_settings.type * "-" * proposal_settings.kernel,
                       "stepsize-"*join(string.(mcmc_config.γ),"-"),
-                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)")
-
+                      "$(Dates.format(now(), "Y-mm-dd-HH-MM-SS"))_$(exp_name)_$(config_tag)_$(job_tag)")
+isdir(target_dir) && error("result directory exists: $(target_dir)")
 println("Storing results in: $target_dir")
 
 println("#############################")
@@ -101,65 +103,39 @@ forward_model_uncorrelated(params) = simulation(params, solver, obs_data, correl
 forward_model_correlated(params) = simulation(params, solver, obs_data, correlated=true)
 
 # Defining likelihood distribution
-likelihood_σ = mcmc_config.likelihood_σ
-if likelihood_σ == 0.0
-    flat_signal = forward_model_uncorrelated(zeros(mcmc_config.dim))
-    residual = obs_data.H .- flat_signal
-    likelihood_σ = vec(std(residual, dims=1)) # set to std of flat signal residuals
-    spatial_cov_mat = cov(residual)
-    println("Calculated likelihood std from flat signal residuals: $(likelihood_σ)")
-end
+# bathymetry-agnostic error model: residual w.r.t. flat reference bathymetry (no bathymetry knowledge)
+flat_signal = forward_model_uncorrelated(zeros(mcmc_config.dim))
+residual    = obs_data.H .- flat_signal
+timesteps   = length(obs_data.t)
+dt          = obs_data.t[2] - obs_data.t[1]
 
-timesteps = length(obs_data.t)
+C_spatial   = cov(residual)                                   # variance per sensor + covariance between sensors
+likelihood_σ = sqrt.(diag(C_spatial))
+println("likelihood std per sensor (agnostic): $(likelihood_σ)")
 
-acf = autocor(residual, 0:timesteps-1)
-# estimate dominant frequency of the residual signal for correlation fit initial guess
-Rf = fft(residual )#.- mean(residual))
-Sf = abs.(Rf).^2
+# temporal correlation: damped oscillation, fitted jointly to all sensors up to ~one wave period
+maxlag = min(300, timesteps ÷ 3)
+lags   = collect(0:maxlag) .* dt
+acf    = autocor(residual, 0:maxlag)                          # (maxlag+1) × sensors
 
-# positive frequencies only
-idx = 1:div(timesteps,2)
+Sf  = abs.(fft(residual, 1)) .^ 2                             # initial guess: dominant frequency
+idx = 2:div(timesteps, 2)
+fr  = fftfreq(timesteps, 1 / dt)[idx][[argmax(Sf[idx, i]) for i in axes(Sf, 2)]]
+p0  = [1.0, mean(fr)]
 
-max_fr_id = argmax(Sf[idx, :], dims=1)
+damped_oscillation(τ, p) = exp.(-abs.(τ) ./ p[1]) .* cos.(2π * p[2] .* τ)
+p_fit = curve_fit(damped_oscillation, repeat(lags, size(acf, 2)), vec(acf), p0).param
+println("temporal kernel: ℓ = $(p_fit[1]) s, f = $(p_fit[2]) Hz")
 
-freqs = fftfreq(timesteps, 1/sim_config.timestep)
-fr = [freqs[idx[id_max[1]]] for id_max in max_fr_id]
+C_temporal = damped_oscillation(obs_data.t .- obs_data.t', p_fit)
+C_total    = Symmetric(kron(C_spatial, C_temporal))
+likelihood_dist = MvNormal(zeros(length(residual)), PDMat(Matrix(C_total)))
 
-# kernel model for time correlation
-# damped oscillation model
-damped_oscillation(τ, p) = exp.(-abs.(τ)./p[1]) .* cos.(2π*p[2].*τ)
-paper_oscillator(τ, p) = exp.(-abs.(τ).*p[1]) .* (cos.(p[2].*τ) + p[1]/p[2] .*sin.(p[2].*abs.(τ)))
+# record what was used
+toml_config["likelihood"] = Dict("type" => "agnostic (residual w.r.t. flat bathymetry)",
+    "sigma" => likelihood_σ, "spatial_cov" => [collect(r) for r in eachrow(C_spatial)],
+    "kernel" => "exp(-|τ|/ℓ) cos(2π f τ)", "ell" => p_fit[1], "f" => p_fit[2], "maxlag_s" => maxlag * dt)
 
-p0 = [2.0, mean(fr)] # initial guess for parameters
-
-p_mean = zeros(length(p0))
-p_pap = zeros(length(p0))
-# fit the model to each column of the autocorrelation function
-for r in eachcol(acf)
-    p_fit = curve_fit(damped_oscillation, obs_data.t, r, p0)
-    println("Fitted parameters for residual: $(p_fit.param)")
-    global p_mean += p_fit.param
-end
-
-for r in eachcol(acf)
-    p_fit = curve_fit(paper_oscillator, obs_data.t, r, p0)
-    println("Fitted parameters for residual: $(p_fit.param)")
-    global p_pap += p_fit.param
-end
-
-p_mean = p_mean ./ size(residual, 2)
-p_pap = p_pap ./ size(residual, 2)
-
-C_temporal = damped_oscillation(obs_data.t .- obs_data.t', p_mean)
-C_pap = paper_oscillator(obs_data.t .- obs_data.t', p_pap)
-C_spatial = spatial_cov_mat
-
-C_total = kron(C_spatial, C_temporal)
-C_tot_pap = kron(C_spatial, C_pap)
-
-residual = vec(residual)
-
-likelihood_dist = MvNormal(zeros(length(residual)), PDMat(C_total))
 
 # define prior distributions
 prior_dist = Vector{Distribution}()
@@ -181,14 +157,13 @@ if proposal_settings.kernel == "smooth"
 end
 
 proposal = RandomWalkProposal(mcmc_config.γ, proposal_kernel)
-
+fixed = [1, mcmc_config.dim]  # mask fixed parameters (first and last)
+proposal = MaskedProposal(proposal, fixed)  # mask fixed parameters
 if lowercase(proposal_settings.type) == "pcn"
     proposal_kernel = Matrix{Float64}(I, mcmc_config.dim, mcmc_config.dim)
     proposal = pCNProposal(mcmc_config.γ[1], PDMat(proposal_kernel))
 end
 println("Using proposal: $(proposal_settings.type)")
-# add newly calculated information to config
-toml_config["sampler"]["likelihood_var"] = likelihood_σ
 
 # Deprecated: (Now directly specified in config file by user)
 # toml_config["sampler"]["prior"] = "$prior_dist"
@@ -201,12 +176,26 @@ model = MCMCModel(pos, forward_model_correlated, obs_data, proposal)
 
 # Define initial parameters
 init_θ = mcmc_config.initial_θ
+xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
 if isempty(init_θ)
-    init_θ = [zeros(mcmc_config.dim) for i in 1:mcmc_config.n_chains]
-    toml_config["sampler"]["init"] = init_θ
-    xs = collect(range(sim_config.xbounds[1], sim_config.xbounds[2], length=mcmc_config.dim))
-    inip = plot(xs, init_θ[1])
+    #init_θ = [zeros(mcmc_config.dim) for i in 1:mcmc_config.n_chains]
+    pr       = toml_config["sampler"]["prior"]
+    G        = MvNormal(SqExpMvNormal(mcmc_config.dim, Int(pr["lengthscale"]), pr["var"]))   # smooth (Gaussian) prior part
+    init_rng = MersenneTwister(get(toml_config["sampler"], "init_seed", seed))
+    init_θ   = [rand(init_rng, G) for _ in 1:mcmc_config.n_chains]
 end
+all(length.(init_θ) .== mcmc_config.dim) || error("initial states must have length $(mcmc_config.dim)")
+
+# fix boundary parameters to zero
+foreach(θ -> θ[fixed] .= 0, init_θ)
+toml_config["sampler"]["init"] = init_θ
+
+toml_config["sampler"]["mask_fixed"] = fixed
+toml_config["run_info"] = Dict("git_commit" => readchomp(`git rev-parse --short HEAD`),
+                               "uncommitted_changes" => !isempty(readchomp(`git status --porcelain`)),
+                               "julia_version" => string(VERSION), "date" => string(now()))
+
+inip = plot(xs, init_θ, label=permutedims(["chain $(i)" for i in eachindex(init_θ)]), xlabel="x [m]", ylabel="b [m]")
 println("#############################")
 
 println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#############################" )
@@ -214,10 +203,21 @@ println("Start $(mcmc_config.n_chains) chains with $(mcmc_config.n) samples: \n#
 ###############################################################################
 # Run the MCMC sampling                                                       #
 ###############################################################################
+ckpt_every = get(toml_config["output"], "checkpoint_every", 5000)
+ckpt_dir   = joinpath(toml_config["output"]["path"], "checkpoints")
+mkpath(ckpt_dir)
+run_tag    = splitext(basename(config_file))[1]            # unique per array job (one config each)
 
 chains = []
 for i in 1:mcmc_config.n_chains
-    chain = sample_chain(model, mcmc_config, init_θ[i], verbose=true, logging=Progress(mcmc_config.n))
+    ckpt_file = joinpath(ckpt_dir, "$(run_tag)_chain_$(i).jls")
+    function write_ckpt(iter, ch)
+        tmp = ckpt_file * ".tmp"
+        serialize(tmp, Matrix(ch))                         # write to a temporary file first,
+        mv(tmp, ckpt_file; force=true)                     # then replace: never a half-written checkpoint
+    end
+    chain = sample_chain(model, mcmc_config, init_θ[i], verbose=true, logging=Progress(mcmc_config.n),
+                         callback_every=ckpt_every, callback=write_ckpt)
     push!(chains, chain)
 end
 
